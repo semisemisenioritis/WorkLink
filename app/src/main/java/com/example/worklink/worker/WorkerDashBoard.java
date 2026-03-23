@@ -1,28 +1,31 @@
 package com.example.worklink.worker;
 
 import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import android.content.Intent;
 import com.example.worklink.DBHelper;
 import com.example.worklink.R;
-import com.example.worklink.worker.JobFeedActivity;
-import com.example.worklink.worker.WorkerProfileActivity;
-import com.example.worklink.worker.EarningsActivity;
 
 public class WorkerDashBoard extends AppCompatActivity {
 
     Switch availabilitySwitch;
     Button jobFeed, profile, earnings;
     DBHelper dbHelper;
-    int workerId = 1; // later get from login session
+    int workerId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_dashboard);
+
+        // Retrieve user session
+        SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
+        workerId = sharedPreferences.getInt("userId", -1);
 
         availabilitySwitch = findViewById(R.id.switchAvailability);
         jobFeed = findViewById(R.id.btnJobFeed);
