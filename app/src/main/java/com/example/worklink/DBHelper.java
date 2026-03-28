@@ -4,12 +4,24 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 public class DBHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "WorkLinkDB";
     public static final int DB_VERSION = 1;
 
+    // Firebase Reference for Real-time Sync
+    private DatabaseReference mDatabase;
+
     public DBHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
+        // Initialize Firebase Reference
+        mDatabase = FirebaseDatabase.getInstance().getReference();
+    }
+
+    public DatabaseReference getFirebaseReference() {
+        return mDatabase;
     }
 
     @Override

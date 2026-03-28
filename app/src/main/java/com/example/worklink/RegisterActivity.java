@@ -1,18 +1,21 @@
 package com.example.worklink;
 
-import android.content.ContentValues;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import java.util.HashMap;
+import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
 
     EditText name, phone, username, password;
     Spinner role;
     Button register;
-    DBHelper dbHelper;
+    DatabaseReference mDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +29,16 @@ public class RegisterActivity extends AppCompatActivity {
         role = findViewById(R.id.spRole);
         register = findViewById(R.id.btnSubmit);
 
-        dbHelper = new DBHelper(this);
+        // 🟢 ACTION REQUIRED: Replace the URL below with YOUR Firebase Database URL
+        // It's found at the top of the Realtime Database tab in Firebase Console
+        String firebaseUrl = "https://worklink-7af36-default-rtdb.firebaseio.com";
+
+        try {
+            mDatabase = FirebaseDatabase.getInstance(firebaseUrl).getReference();
+        } catch (Exception e) {
+            mDatabase = FirebaseDatabase.getInstance().getReference();
+            Log.e("FirebaseError", "Manual URL failed, trying default: " + e.getMessage());
+        }
 
         String[] roles = {"Worker", "Employer"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
@@ -40,61 +52,49 @@ public class RegisterActivity extends AppCompatActivity {
             String passText = password.getText().toString().trim();
             String selectedRole = role.getSelectedItem().toString();
 
-            // 1. Check for empty fields
             if (TextUtils.isEmpty(nameText) || TextUtils.isEmpty(phoneText) ||
                 TextUtils.isEmpty(userText) || TextUtils.isEmpty(passText)) {
                 Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // 2. Name validation (Alpha only)
-            if (!nameText.matches("^[a-zA-Z\\s]+$")) {
-                name.setError("Name must contain only letters");
-                return;
-            }
+            // Create User Object for Firebase
+            String userId = mDatabase.child("users").push().getKey();
+            
+            Map<String, Object> userValues = new HashMap<>();
+            userValues.put("id", userId);
+            userValues.put("name", nameText);
+            userValues.put("phone", phoneText);
+            userValues.put("username", userText);
+            userValues.put("password", passText);
+            userValues.put("role", selectedRole);
 
-            // 3. Phone validation (10 digits)
-            if (!phoneText.matches("^\\d{10}$")) {
-                phone.setError("Phone must be exactly 10 digits");
-                return;
-            }
-
-            // 4. Username validation (Alphanumeric)
-            if (!userText.matches("^[a-zA-Z0-9]+$")) {
-                username.setError("Username must be alphanumeric");
-                return;
-            }
-
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
-            ContentValues values = new ContentValues();
-            values.put("name", nameText);
-            values.put("phone", phoneText);
-            values.put("username", userText);
-            values.put("password", passText);
-            values.put("role", selectedRole);
-
-            try {
-                long userId = db.insertOrThrow("users", null, values);
-
-                if (userId != -1) {
+            mDatabase.child("users").child(userText).setValue(userValues)
+                .addOnSuccessListener(aVoid -> {
+                    // Create Profile based on role in Firebase
                     if ("Worker".equals(selectedRole)) {
-                        ContentValues workerValues = new ContentValues();
-                        workerValues.put("worker_id", userId);
-                        workerValues.put("skills", "None");
-                        workerValues.put("experience", 0);
-                        db.insert("worker_profile", null, workerValues);
+                        Map<String, Object> workerProfile = new HashMap<>();
+                        workerProfile.put("worker_id", userId);
+                        workerProfile.put("username", userText);
+                        workerProfile.put("skills", "None");
+                        workerProfile.put("experience", 0);
+                        workerProfile.put("rating", 0.0);
+                        workerProfile.put("availability", 1);
+                        mDatabase.child("worker_profile").child(userText).setValue(workerProfile);
                     } else {
-                        ContentValues employerValues = new ContentValues();
-                        employerValues.put("employer_id", userId);
-                        db.insert("employer_profile", null, employerValues);
+                        Map<String, Object> employerProfile = new HashMap<>();
+                        employerProfile.put("employer_id", userId);
+                        employerProfile.put("username", userText);
+                        mDatabase.child("employer_profile").child(userText).setValue(employerProfile);
                     }
 
-                    Toast.makeText(this, "Registered Successfully", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Registered Successfully on Cloud", Toast.LENGTH_SHORT).show();
                     finish();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "Username or Phone already exists", Toast.LENGTH_LONG).show();
-            }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Registration Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Log.e("FirebaseRegister", "Error: ", e);
+                });
         });
     }
 }
