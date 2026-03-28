@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.worklink.worker.WorkerDashBoard;
@@ -30,11 +31,26 @@ public class LoginActivity extends AppCompatActivity {
         dbHelper = new DBHelper(this);
 
         login.setOnClickListener(v -> {
+            String userText = username.getText().toString().trim();
+            String passText = password.getText().toString().trim();
+
+            // 1. Check for empty fields
+            if (TextUtils.isEmpty(userText) || TextUtils.isEmpty(passText)) {
+                Toast.makeText(this, "Please enter both username and password", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // 2. Alphanumeric check for username (to match registration style)
+            if (!userText.matches("^[a-zA-Z0-9]+$")) {
+                username.setError("Invalid username format");
+                return;
+            }
+
             SQLiteDatabase db = dbHelper.getReadableDatabase();
 
             Cursor cursor = db.rawQuery(
                     "SELECT id, role FROM users WHERE username=? AND password=?",
-                    new String[]{username.getText().toString(), password.getText().toString()}
+                    new String[]{userText, passText}
             );
 
             if (cursor.moveToFirst()) {
@@ -55,10 +71,10 @@ public class LoginActivity extends AppCompatActivity {
                 } else {
                     startActivity(new Intent(this, EmployerDashBoard.class));
                 }
-                finish(); // Close login activity
+                finish();
 
             } else {
-                Toast.makeText(this, "Invalid Credentials", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Invalid Username or Password", Toast.LENGTH_SHORT).show();
             }
             cursor.close();
         });

@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -14,8 +15,9 @@ import com.example.worklink.R;
 
 public class WorkerProfileActivity extends AppCompatActivity {
 
-    EditText skills, experience;
-    Button save;
+    EditText etSkills, etExperience;
+    TextView tvCurrentSkills, tvCurrentExperience;
+    Button btnSave;
     DBHelper dbHelper;
     int workerId;
 
@@ -28,27 +30,55 @@ public class WorkerProfileActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
-        skills = findViewById(R.id.etSkills);
-        experience = findViewById(R.id.etExperience);
-        save = findViewById(R.id.btnSave);
+        etSkills = findViewById(R.id.etSkills);
+        etExperience = findViewById(R.id.etExperience);
+        tvCurrentSkills = findViewById(R.id.tvCurrentSkills);
+        tvCurrentExperience = findViewById(R.id.tvCurrentExperience);
+        btnSave = findViewById(R.id.btnSave);
 
         dbHelper = new DBHelper(this);
         
         loadProfileData();
 
-        save.setOnClickListener(v -> {
+        btnSave.setOnClickListener(v -> {
+            String newSkills = etSkills.getText().toString().trim();
+            String newExp = etExperience.getText().toString().trim();
+
+            if (TextUtils.isEmpty(newSkills) || TextUtils.isEmpty(newExp)) {
+                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             SQLiteDatabase db = dbHelper.getWritableDatabase();
 
+            // Logic: Append new skills to existing ones
+            String currentSkills = "";
+            Cursor cursor = db.rawQuery("SELECT skills FROM worker_profile WHERE worker_id=?", 
+                    new String[]{String.valueOf(workerId)});
+            if (cursor.moveToFirst()) {
+                currentSkills = cursor.getString(0);
+            }
+            cursor.close();
+
+            String updatedSkills;
+            if (currentSkills == null || currentSkills.isEmpty() || currentSkills.equals("None")) {
+                updatedSkills = newSkills;
+            } else {
+                updatedSkills = currentSkills + ", " + newSkills;
+            }
+
             ContentValues values = new ContentValues();
-            values.put("skills", skills.getText().toString());
-            String expStr = experience.getText().toString();
-            values.put("experience", expStr.isEmpty() ? 0 : Integer.parseInt(expStr));
+            values.put("skills", updatedSkills);
+            values.put("experience", Integer.parseInt(newExp));
 
             int rows = db.update("worker_profile", values, "worker_id=?",
                     new String[]{String.valueOf(workerId)});
 
             if (rows > 0) {
                 Toast.makeText(this, "Profile Updated", Toast.LENGTH_SHORT).show();
+                etSkills.setText(""); // Clear input
+                etExperience.setText(""); // Clear input
+                loadProfileData(); // Refresh the "Current Profile" display
             } else {
                 Toast.makeText(this, "Update Failed", Toast.LENGTH_SHORT).show();
             }
@@ -61,8 +91,11 @@ public class WorkerProfileActivity extends AppCompatActivity {
                 new String[]{String.valueOf(workerId)});
         
         if (cursor.moveToFirst()) {
-            skills.setText(cursor.getString(0));
-            experience.setText(String.valueOf(cursor.getInt(1)));
+            String skills = cursor.getString(0);
+            int exp = cursor.getInt(1);
+            
+            tvCurrentSkills.setText("Skills: " + (TextUtils.isEmpty(skills) ? "None" : skills));
+            tvCurrentExperience.setText("Experience: " + exp + " years");
         }
         cursor.close();
     }

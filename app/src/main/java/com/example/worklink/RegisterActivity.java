@@ -3,6 +3,7 @@ package com.example.worklink;
 import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -33,36 +34,66 @@ public class RegisterActivity extends AppCompatActivity {
         role.setAdapter(adapter);
 
         register.setOnClickListener(v -> {
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            String nameText = name.getText().toString().trim();
+            String phoneText = phone.getText().toString().trim();
+            String userText = username.getText().toString().trim();
+            String passText = password.getText().toString().trim();
             String selectedRole = role.getSelectedItem().toString();
 
+            // 1. Check for empty fields
+            if (TextUtils.isEmpty(nameText) || TextUtils.isEmpty(phoneText) ||
+                TextUtils.isEmpty(userText) || TextUtils.isEmpty(passText)) {
+                Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // 2. Name validation (Alpha only)
+            if (!nameText.matches("^[a-zA-Z\\s]+$")) {
+                name.setError("Name must contain only letters");
+                return;
+            }
+
+            // 3. Phone validation (10 digits)
+            if (!phoneText.matches("^\\d{10}$")) {
+                phone.setError("Phone must be exactly 10 digits");
+                return;
+            }
+
+            // 4. Username validation (Alphanumeric)
+            if (!userText.matches("^[a-zA-Z0-9]+$")) {
+                username.setError("Username must be alphanumeric");
+                return;
+            }
+
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
             ContentValues values = new ContentValues();
-            values.put("name", name.getText().toString());
-            values.put("phone", phone.getText().toString());
-            values.put("username", username.getText().toString());
-            values.put("password", password.getText().toString());
+            values.put("name", nameText);
+            values.put("phone", phoneText);
+            values.put("username", userText);
+            values.put("password", passText);
             values.put("role", selectedRole);
 
-            long userId = db.insert("users", null, values);
+            try {
+                long userId = db.insertOrThrow("users", null, values);
 
-            if (userId != -1) {
-                // Create profile based on role
-                if ("Worker".equals(selectedRole)) {
-                    ContentValues workerValues = new ContentValues();
-                    workerValues.put("worker_id", userId);
-                    workerValues.put("skills", "None"); // Default value
-                    workerValues.put("experience", 0);
-                    db.insert("worker_profile", null, workerValues);
-                } else {
-                    ContentValues employerValues = new ContentValues();
-                    employerValues.put("employer_id", userId);
-                    db.insert("employer_profile", null, employerValues);
+                if (userId != -1) {
+                    if ("Worker".equals(selectedRole)) {
+                        ContentValues workerValues = new ContentValues();
+                        workerValues.put("worker_id", userId);
+                        workerValues.put("skills", "None");
+                        workerValues.put("experience", 0);
+                        db.insert("worker_profile", null, workerValues);
+                    } else {
+                        ContentValues employerValues = new ContentValues();
+                        employerValues.put("employer_id", userId);
+                        db.insert("employer_profile", null, employerValues);
+                    }
+
+                    Toast.makeText(this, "Registered Successfully", Toast.LENGTH_SHORT).show();
+                    finish();
                 }
-
-                Toast.makeText(this, "Registered Successfully", Toast.LENGTH_SHORT).show();
-                finish();
-            } else {
-                Toast.makeText(this, "Registration Failed (Username/Phone may exist)", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "Username or Phone already exists", Toast.LENGTH_LONG).show();
             }
         });
     }
