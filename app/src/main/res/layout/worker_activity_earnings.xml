@@ -18,7 +18,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Total Earnings: ₹0"
+            android:text="Total: ₹0"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -32,10 +32,37 @@
             android:textColor="#FF9800" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/btnDateRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📅 Select Date Range"
+        android:backgroundTint="#673AB7"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:id="@+id/tvSelectedRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Showing All Time"
+        android:gravity="center"
+        android:textStyle="italic"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnClearFilter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Clear Filter"
+        android:layout_marginBottom="10dp"
+        android:visibility="gone"
+        style="@style/Widget.MaterialComponents.Button.TextButton"/>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Recent Jobs &amp; Reviews"
+        android:text="Job History &amp; Reviews"
         android:textSize="16sp"
         android:textStyle="bold"
         android:layout_marginBottom="8dp"/>

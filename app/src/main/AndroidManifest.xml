@@ -18,6 +18,7 @@
         <activity android:name=".worker.JobFeedActivity" />
         <activity android:name=".worker.WorkerProfileActivity" />
         <activity android:name=".worker.EarningsActivity" />
+        <activity android:name=".worker.ResumeViewerActivity" />
 
         <!-- 🔷 Employer Module -->
         <activity android:name=".employer.EmployerDashBoard" />

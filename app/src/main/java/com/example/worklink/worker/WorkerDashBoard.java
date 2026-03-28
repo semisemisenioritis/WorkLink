@@ -14,7 +14,7 @@ import com.example.worklink.R;
 public class WorkerDashBoard extends AppCompatActivity {
 
     Switch availabilitySwitch;
-    Button jobFeed, profile, earnings;
+    Button jobFeed, profile, earnings, btnResume;
     DBHelper dbHelper;
     int workerId;
 
@@ -31,6 +31,7 @@ public class WorkerDashBoard extends AppCompatActivity {
         jobFeed = findViewById(R.id.btnJobFeed);
         profile = findViewById(R.id.btnProfile);
         earnings = findViewById(R.id.btnEarnings);
+        btnResume = findViewById(R.id.btnViewResume); // Keeping ID but changing behavior
 
         dbHelper = new DBHelper(this);
 
@@ -61,5 +62,10 @@ public class WorkerDashBoard extends AppCompatActivity {
         earnings.setOnClickListener(v ->
                 startActivity(new Intent(this, EarningsActivity.class))
         );
+
+        // Open Resume Viewer (New Behavior)
+        btnResume.setOnClickListener(v -> {
+            startActivity(new Intent(this, ResumeViewerActivity.class));
+        });
     }
 }
