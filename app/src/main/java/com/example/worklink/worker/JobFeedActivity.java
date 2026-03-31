@@ -55,7 +55,12 @@ public class JobFeedActivity extends AppCompatActivity {
         jobsList.clear();
         jobIds.clear();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT * FROM jobs WHERE status='OPEN'", null);
+        
+        // Filter out jobs that the user has already applied for
+        String query = "SELECT * FROM jobs WHERE status='OPEN' AND job_id NOT IN " +
+                       "(SELECT job_id FROM applications WHERE worker_id = ?)";
+        
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(workerId)});
 
         while (cursor.moveToNext()) {
             jobIds.add(cursor.getInt(0));
@@ -72,7 +77,7 @@ public class JobFeedActivity extends AppCompatActivity {
     private void applyForJob(int jobId) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
 
-        // Check if already applied
+        // Check if already applied (redundant now due to filtering, but good for safety)
         Cursor check = db.rawQuery("SELECT * FROM applications WHERE job_id=? AND worker_id=?",
                 new String[]{String.valueOf(jobId), String.valueOf(workerId)});
         
@@ -87,6 +92,9 @@ public class JobFeedActivity extends AppCompatActivity {
             db.execSQL("INSERT INTO applications (job_id, worker_id, status) VALUES (?, ?, 'pending')",
                     new Object[]{jobId, workerId});
             Toast.makeText(this, "Application Sent Successfully!", Toast.LENGTH_SHORT).show();
+            
+            // Refresh the feed to remove the applied job
+            loadJobs();
         } catch (Exception e) {
             Toast.makeText(this, "Error sending application", Toast.LENGTH_SHORT).show();
         }
