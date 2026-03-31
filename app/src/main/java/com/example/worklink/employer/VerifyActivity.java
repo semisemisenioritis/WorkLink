@@ -6,10 +6,12 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.ArrayList;
 
@@ -71,7 +73,6 @@ public class VerifyActivity extends AppCompatActivity {
         }
     }
 
-    // Inner class for data structure
     static class VerifyItem {
         int bookingId, workerId, duration;
         String workerName, jobTitle;
@@ -88,7 +89,6 @@ public class VerifyActivity extends AppCompatActivity {
         }
     }
 
-    // Custom Adapter for the button
     private class VerifyAdapter extends ArrayAdapter<VerifyItem> {
         VerifyAdapter(Context context, ArrayList<VerifyItem> items) {
             super(context, 0, items);
@@ -103,6 +103,7 @@ public class VerifyActivity extends AppCompatActivity {
             VerifyItem item = getItem(position);
             TextView info = convertView.findViewById(R.id.tvVerifyInfo);
             Button btnComplete = convertView.findViewById(R.id.btnMarkComplete);
+            Button btnTerminate = convertView.findViewById(R.id.btnTerminate);
 
             info.setText("Worker: " + item.workerName + "\nJob: " + item.jobTitle + 
                          "\nTotal: ₹" + item.total + " (" + item.duration + " days)");
@@ -112,8 +113,6 @@ public class VerifyActivity extends AppCompatActivity {
                 db.execSQL("UPDATE bookings SET status='COMPLETED' WHERE booking_id=?",
                         new Object[]{item.bookingId});
 
-                Toast.makeText(VerifyActivity.this, "Marked Completed.", Toast.LENGTH_SHORT).show();
-
                 Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
                 intent.putExtra("bookingId", item.bookingId);
                 intent.putExtra("workerId", item.workerId);
@@ -122,7 +121,52 @@ public class VerifyActivity extends AppCompatActivity {
                 finish();
             });
 
+            btnTerminate.setOnClickListener(v -> {
+                showTerminateDialog(item);
+            });
+
             return convertView;
         }
+    }
+
+    private void showTerminateDialog(VerifyItem item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Terminate Employment");
+        builder.setMessage("Enter the actual number of days worked by " + item.workerName + ":");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Max days: " + item.duration);
+        builder.setView(input);
+
+        builder.setPositiveButton("Proceed to Payment", (dialog, which) -> {
+            String daysStr = input.getText().toString();
+            if (daysStr.isEmpty()) {
+                Toast.makeText(this, "Please enter days worked", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            int daysWorked = Integer.parseInt(daysStr);
+            if (daysWorked > item.duration) {
+                Toast.makeText(this, "Days worked cannot exceed original duration", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            double newTotal = daysWorked * item.dailyWage;
+
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            db.execSQL("UPDATE bookings SET status='TERMINATED' WHERE booking_id=?",
+                    new Object[]{item.bookingId});
+
+            Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
+            intent.putExtra("bookingId", item.bookingId);
+            intent.putExtra("workerId", item.workerId);
+            intent.putExtra("amount", newTotal);
+            startActivity(intent);
+            finish();
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
     }
 }

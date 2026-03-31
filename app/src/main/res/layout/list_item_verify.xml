@@ -15,14 +15,29 @@
         android:textColor="#FFFFFF"
         android:textSize="16sp" />
 
-    <Button
-        android:id="@+id/btnMarkComplete"
+    <LinearLayout
+        android:orientation="vertical"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Complete"
-        android:backgroundTint="#1E88E5"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:layout_marginStart="8dp" />
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/btnMarkComplete"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Complete"
+            android:backgroundTint="#1E88E5"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btnTerminate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Terminate"
+            android:backgroundTint="#D32F2F"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+    </LinearLayout>
 
 </LinearLayout>
