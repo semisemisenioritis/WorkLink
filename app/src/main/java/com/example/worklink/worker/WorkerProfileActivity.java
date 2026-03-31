@@ -17,7 +17,7 @@ public class WorkerProfileActivity extends AppCompatActivity {
 
     EditText etSkills, etExperience;
     TextView tvCurrentSkills, tvCurrentExperience;
-    Button btnSave;
+    Button btnAddSkill, btnUpdateExp;
     DBHelper dbHelper;
     int workerId;
 
@@ -34,24 +34,25 @@ public class WorkerProfileActivity extends AppCompatActivity {
         etExperience = findViewById(R.id.etExperience);
         tvCurrentSkills = findViewById(R.id.tvCurrentSkills);
         tvCurrentExperience = findViewById(R.id.tvCurrentExperience);
-        btnSave = findViewById(R.id.btnSave);
+        btnAddSkill = findViewById(R.id.btnAddSkill);
+        btnUpdateExp = findViewById(R.id.btnUpdateExp);
 
         dbHelper = new DBHelper(this);
         
         loadProfileData();
 
-        btnSave.setOnClickListener(v -> {
-            String newSkills = etSkills.getText().toString().trim();
-            String newExp = etExperience.getText().toString().trim();
+        // Handle Adding a Single Skill
+        btnAddSkill.setOnClickListener(v -> {
+            String newSkill = etSkills.getText().toString().trim();
 
-            if (TextUtils.isEmpty(newSkills) || TextUtils.isEmpty(newExp)) {
-                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+            if (TextUtils.isEmpty(newSkill)) {
+                Toast.makeText(this, "Enter a skill to add", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             SQLiteDatabase db = dbHelper.getWritableDatabase();
 
-            // Logic: Append new skills to existing ones
+            // Get existing skills
             String currentSkills = "";
             Cursor cursor = db.rawQuery("SELECT skills FROM worker_profile WHERE worker_id=?", 
                     new String[]{String.valueOf(workerId)});
@@ -62,26 +63,46 @@ public class WorkerProfileActivity extends AppCompatActivity {
 
             String updatedSkills;
             if (currentSkills == null || currentSkills.isEmpty() || currentSkills.equals("None")) {
-                updatedSkills = newSkills;
+                updatedSkills = newSkill;
             } else {
-                updatedSkills = currentSkills + ", " + newSkills;
+                // Prevent adding same skill twice
+                if (currentSkills.toLowerCase().contains(newSkill.toLowerCase())) {
+                    Toast.makeText(this, "Skill already exists", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                updatedSkills = currentSkills + ", " + newSkill;
             }
 
             ContentValues values = new ContentValues();
             values.put("skills", updatedSkills);
-            values.put("experience", Integer.parseInt(newExp));
 
-            int rows = db.update("worker_profile", values, "worker_id=?",
+            db.update("worker_profile", values, "worker_id=?",
                     new String[]{String.valueOf(workerId)});
 
-            if (rows > 0) {
-                Toast.makeText(this, "Profile Updated", Toast.LENGTH_SHORT).show();
-                etSkills.setText(""); // Clear input
-                etExperience.setText(""); // Clear input
-                loadProfileData(); // Refresh the "Current Profile" display
-            } else {
-                Toast.makeText(this, "Update Failed", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Skill added", Toast.LENGTH_SHORT).show();
+            etSkills.setText("");
+            loadProfileData();
+        });
+
+        // Handle Updating Experience separately
+        btnUpdateExp.setOnClickListener(v -> {
+            String expStr = etExperience.getText().toString().trim();
+
+            if (TextUtils.isEmpty(expStr)) {
+                Toast.makeText(this, "Enter years of experience", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put("experience", Integer.parseInt(expStr));
+
+            db.update("worker_profile", values, "worker_id=?",
+                    new String[]{String.valueOf(workerId)});
+
+            Toast.makeText(this, "Experience updated", Toast.LENGTH_SHORT).show();
+            etExperience.setText("");
+            loadProfileData();
         });
     }
 

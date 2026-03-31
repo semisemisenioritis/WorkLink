@@ -1,9 +1,12 @@
 package com.example.worklink.worker;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.*;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.worklink.DBHelper;
@@ -16,43 +19,76 @@ public class JobFeedActivity extends AppCompatActivity {
     ListView listView;
     DBHelper dbHelper;
     ArrayList<String> jobsList;
+    ArrayList<Integer> jobIds;
     ArrayAdapter<String> adapter;
-    int workerId = 1;
+    int workerId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_job_feed);
 
+        SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
+        workerId = sharedPreferences.getInt("userId", -1);
+
         listView = findViewById(R.id.jobListView);
         dbHelper = new DBHelper(this);
         jobsList = new ArrayList<>();
+        jobIds = new ArrayList<>();
 
+        loadJobs();
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            int jobId = jobIds.get(position);
+            String jobTitle = jobsList.get(position).split(" - ")[0];
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Apply for Job")
+                    .setMessage("Do you want to send an application for \"" + jobTitle + "\"?")
+                    .setPositiveButton("Yes", (dialog, which) -> applyForJob(jobId))
+                    .setNegativeButton("No", null)
+                    .show();
+        });
+    }
+
+    private void loadJobs() {
+        jobsList.clear();
+        jobIds.clear();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         Cursor cursor = db.rawQuery("SELECT * FROM jobs WHERE status='OPEN'", null);
 
         while (cursor.moveToNext()) {
+            jobIds.add(cursor.getInt(0));
             String job = cursor.getString(2) + " - ₹" + cursor.getDouble(5);
             jobsList.add(job);
         }
+        cursor.close();
 
         adapter = new ArrayAdapter<>(this,
                 R.layout.list_item_white_text, jobsList);
         listView.setAdapter(adapter);
+    }
 
-        // Apply job on click
-        listView.setOnItemClickListener((parent, view, position, id) -> {
+    private void applyForJob(int jobId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
 
-            Cursor c = db.rawQuery("SELECT job_id FROM jobs WHERE status='OPEN' LIMIT 1 OFFSET " + position, null);
+        // Check if already applied
+        Cursor check = db.rawQuery("SELECT * FROM applications WHERE job_id=? AND worker_id=?",
+                new String[]{String.valueOf(jobId), String.valueOf(workerId)});
+        
+        if (check.getCount() > 0) {
+            Toast.makeText(this, "You have already applied for this job", Toast.LENGTH_SHORT).show();
+            check.close();
+            return;
+        }
+        check.close();
 
-            if (c.moveToFirst()) {
-                int jobId = c.getInt(0);
-
-                db.execSQL("INSERT INTO bookings (job_id, worker_id, status) VALUES (?, ?, 'PENDING')",
-                        new Object[]{jobId, workerId});
-
-                Toast.makeText(this, "Applied for Job", Toast.LENGTH_SHORT).show();
-            }
-        });
+        try {
+            db.execSQL("INSERT INTO applications (job_id, worker_id, status) VALUES (?, ?, 'pending')",
+                    new Object[]{jobId, workerId});
+            Toast.makeText(this, "Application Sent Successfully!", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error sending application", Toast.LENGTH_SHORT).show();
+        }
     }
 }

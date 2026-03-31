@@ -13,19 +13,21 @@
         android:theme="@style/Theme.WorkLink">
         <activity android:name=".RegisterActivity" />
 
-        <!-- 🔷 Worker Module -->
+        <!-- Worker Module -->
         <activity android:name=".worker.WorkerDashBoard" />
         <activity android:name=".worker.JobFeedActivity" />
         <activity android:name=".worker.WorkerProfileActivity" />
         <activity android:name=".worker.EarningsActivity" />
         <activity android:name=".worker.ResumeViewerActivity" />
+        <activity android:name=".worker.ApplicationsActivity" />
 
-        <!-- 🔷 Employer Module -->
+        <!-- Employer Module -->
         <activity android:name=".employer.EmployerDashBoard" />
         <activity android:name=".employer.SearchWorkerActivity" />
         <activity android:name=".employer.PostJobActivity" />
         <activity android:name=".employer.VerifyActivity" />
         <activity android:name=".employer.PaymentRatingActivity" />
+
         <activity
             android:name=".LoginActivity"
             android:exported="true">

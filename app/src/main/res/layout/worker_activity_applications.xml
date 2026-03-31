@@ -7,34 +7,19 @@
     android:layout_height="match_parent">
 
     <TextView
-        android:text="Review Applicants"
+        android:text="My Applications"
         android:textSize="35sp"
         android:textStyle="bold"
         android:textColor="#FFFFFF"
-        android:layout_marginBottom="30dp"
+        android:layout_marginBottom="20dp"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <TextView
-        android:text="Select Job to Review"
-        android:textColor="#8892B0"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <Spinner
-        android:id="@+id/spJobs"
-        android:background="#112240"
-        android:padding="12dp"
-        android:layout_marginBottom="24dp"
-        android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
     <ListView
-        android:id="@+id/listWorkers"
+        android:id="@+id/lvApplications"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:divider="#112240"
         android:dividerHeight="1dp"/>
+
 </LinearLayout>

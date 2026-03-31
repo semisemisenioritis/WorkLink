@@ -1,83 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="20dp"
-    android:background="#0A192F"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#0A192F">
 
-    <TextView
-        android:id="@+id/tvProfileTitle"
-        android:text="Worker Profile"
-        android:textSize="35sp"
-        android:textStyle="bold"
-        android:textColor="#E6F1FF"
-        android:layout_marginBottom="20dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <EditText
-        android:id="@+id/etSkills"
-        android:hint="Enter New Skills (e.g. Plumbing, Electrician)"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp"
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="20dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content">
 
-    <EditText
-        android:id="@+id/etExperience"
-        android:hint="Years of Experience"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:inputType="number"
-        android:layout_marginBottom="16dp"/>
+        <TextView
+            android:id="@+id/tvProfileTitle"
+            android:text="Worker Profile"
+            android:textSize="35sp"
+            android:textStyle="bold"
+            android:textColor="#E6F1FF"
+            android:layout_marginBottom="24dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnSave"
-        android:text="Update Profile"
-        android:backgroundTint="#1E88E5"
-        android:textColor="#FFFFFF"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="20dp"/>
+        <!-- Experience Section -->
+        <TextView
+            android:text="Experience"
+            android:textColor="#8892B0"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#112240"
-        android:layout_marginBottom="20dp"/>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp">
 
-    <TextView
-        android:text="Current Profile"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:textColor="#E6F1FF"
-        android:layout_marginBottom="10dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+            <EditText
+                android:id="@+id/etExperience"
+                android:hint="Years"
+                android:background="#112240"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#8892B0"
+                android:padding="12dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:layout_marginEnd="8dp"/>
 
-    <TextView
-        android:id="@+id/tvCurrentSkills"
-        android:text="Skills: None"
-        android:textSize="16sp"
-        android:textColor="#8892B0"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="5dp"/>
+            <Button
+                android:id="@+id/btnUpdateExp"
+                android:text="Set"
+                android:backgroundTint="#1E88E5"
+                android:textColor="#FFFFFF"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvCurrentExperience"
-        android:text="Experience: 0 years"
-        android:textSize="16sp"
-        android:textColor="#8892B0"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <!-- Skills Section -->
+        <TextView
+            android:text="Skills"
+            android:textColor="#8892B0"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-</LinearLayout>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp">
+
+            <EditText
+                android:id="@+id/etSkills"
+                android:hint="Add a skill (e.g. Plumbing)"
+                android:background="#112240"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#8892B0"
+                android:padding="12dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btnAddSkill"
+                android:text="Add"
+                android:backgroundTint="#1E88E5"
+                android:textColor="#FFFFFF"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#112240"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Current Profile Display -->
+        <TextView
+            android:text="Current Profile"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#E6F1FF"
+            android:layout_marginBottom="16dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:id="@+id/tvCurrentExperience"
+            android:text="Experience: 0 years"
+            android:textSize="18sp"
+            android:textColor="#FFFFFF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvCurrentSkills"
+            android:text="Skills: None"
+            android:textSize="16sp"
+            android:textColor="#8892B0"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+    </LinearLayout>
+</ScrollView>

@@ -8,13 +8,15 @@ import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import com.example.worklink.DBHelper;
+import com.example.worklink.LoginActivity;
 import com.example.worklink.R;
 
 public class WorkerDashBoard extends AppCompatActivity {
 
-    Switch availabilitySwitch;
-    Button jobFeed, profile, earnings, btnResume;
+    SwitchCompat availabilitySwitch;
+    Button jobFeed, profile, earnings, btnResume, btnApplications, logout;
     DBHelper dbHelper;
     int workerId;
 
@@ -29,9 +31,11 @@ public class WorkerDashBoard extends AppCompatActivity {
 
         availabilitySwitch = findViewById(R.id.switchAvailability);
         jobFeed = findViewById(R.id.btnJobFeed);
+        btnApplications = findViewById(R.id.btnApplications);
         profile = findViewById(R.id.btnProfile);
         earnings = findViewById(R.id.btnEarnings);
-        btnResume = findViewById(R.id.btnViewResume); // Keeping ID but changing behavior
+        btnResume = findViewById(R.id.btnViewResume);
+        logout = findViewById(R.id.btnLogout);
 
         dbHelper = new DBHelper(this);
 
@@ -53,6 +57,11 @@ public class WorkerDashBoard extends AppCompatActivity {
                 startActivity(new Intent(this, JobFeedActivity.class))
         );
 
+        // Open Applications Status
+        btnApplications.setOnClickListener(v ->
+                startActivity(new Intent(this, ApplicationsActivity.class))
+        );
+
         // Open Profile
         profile.setOnClickListener(v ->
                 startActivity(new Intent(this, WorkerProfileActivity.class))
@@ -63,9 +72,23 @@ public class WorkerDashBoard extends AppCompatActivity {
                 startActivity(new Intent(this, EarningsActivity.class))
         );
 
-        // Open Resume Viewer (New Behavior)
+        // Open Resume Viewer
         btnResume.setOnClickListener(v -> {
             startActivity(new Intent(this, ResumeViewerActivity.class));
+        });
+
+        // Logout
+        logout.setOnClickListener(v -> {
+            // Clear session
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.clear();
+            editor.apply();
+
+            // Redirect to Login
+            Intent intent = new Intent(WorkerDashBoard.this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
         });
     }
 }
