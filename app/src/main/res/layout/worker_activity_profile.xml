@@ -2,14 +2,16 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:padding="20dp"
+    android:background="#0A192F"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <TextView
+        android:id="@+id/tvProfileTitle"
         android:text="Worker Profile"
         android:textSize="35sp"
         android:textStyle="bold"
-        android:textColor="#7B506F"
+        android:textColor="#E6F1FF"
         android:layout_marginBottom="20dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
@@ -17,19 +19,31 @@
     <EditText
         android:id="@+id/etSkills"
         android:hint="Enter New Skills (e.g. Plumbing, Electrician)"
+        android:background="#112240"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#8892B0"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
     <EditText
         android:id="@+id/etExperience"
         android:hint="Years of Experience"
+        android:background="#112240"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#8892B0"
+        android:padding="12dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:inputType="number"/>
+        android:inputType="number"
+        android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/btnSave"
         android:text="Update Profile"
+        android:backgroundTint="#1E88E5"
+        android:textColor="#FFFFFF"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="20dp"/>
@@ -37,13 +51,14 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#CCCCCC"
+        android:background="#112240"
         android:layout_marginBottom="20dp"/>
 
     <TextView
         android:text="Current Profile"
         android:textSize="20sp"
         android:textStyle="bold"
+        android:textColor="#E6F1FF"
         android:layout_marginBottom="10dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
@@ -52,6 +67,7 @@
         android:id="@+id/tvCurrentSkills"
         android:text="Skills: None"
         android:textSize="16sp"
+        android:textColor="#8892B0"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="5dp"/>
@@ -60,6 +76,7 @@
         android:id="@+id/tvCurrentExperience"
         android:text="Experience: 0 years"
         android:textSize="16sp"
+        android:textColor="#8892B0"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 

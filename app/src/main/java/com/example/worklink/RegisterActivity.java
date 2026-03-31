@@ -30,7 +30,8 @@ public class RegisterActivity extends AppCompatActivity {
 
         String[] roles = {"Worker", "Employer"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, roles);
+                R.layout.spinner_item_white_text, roles);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         role.setAdapter(adapter);
 
         register.setOnClickListener(v -> {

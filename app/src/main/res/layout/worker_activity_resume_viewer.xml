@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp"
-    android:background="#F5F5F5">
+    android:background="#0A192F">
 
     <TextView
         android:layout_width="match_parent"
@@ -14,14 +14,14 @@
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginBottom="20dp"
-        android:textColor="#333333"/>
+        android:textColor="#E6F1FF"/>
 
     <!-- Scrollable Resume Content Preview -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@android:color/white"
+        android:background="#112240"
         android:elevation="4dp"
         android:padding="20dp">
 
@@ -30,7 +30,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="16sp"
-            android:textColor="#000000"
+            android:textColor="#E6F1FF"
             android:lineSpacingExtra="4dp"/>
     </ScrollView>
 
@@ -40,7 +40,7 @@
         android:layout_height="wrap_content"
         android:text="Download PDF"
         android:layout_marginTop="20dp"
-        android:backgroundTint="#4CAF50"
+        android:backgroundTint="#1E88E5"
         android:textColor="#FFFFFF"/>
 
 </LinearLayout>

@@ -167,6 +167,6 @@ public class EarningsActivity extends AppCompatActivity {
         }
 
         reviewsList.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1, reviews));
+                R.layout.list_item_white_text, reviews));
     }
 }

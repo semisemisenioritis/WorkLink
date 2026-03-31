@@ -2,41 +2,54 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:padding="20dp"
-    android:background="#EAD7D1"
+    android:background="#0A192F"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <TextView
+        android:id="@+id/tvDashboardTitle"
         android:text="Worker Dashboard"
         android:textSize="35sp"
         android:textStyle="bold"
-        android:textColor="#7B506F"
+        android:textColor="#E6F1FF"
         android:layout_marginBottom="30dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
-    <Switch
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switchAvailability"
         android:text="Available for Work"
+        android:textColor="#E6F1FF"
         android:layout_marginBottom="15dp"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content"
+        android:thumbTint="#1E88E5"
+        android:trackTint="#112240"/>
 
     <Button
         android:id="@+id/btnJobFeed"
         android:text="View Job Feed"
+        android:backgroundTint="#1E88E5"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
     <Button
         android:id="@+id/btnProfile"
         android:text="Manage Profile"
+        android:backgroundTint="#112240"
+        android:textColor="#E6F1FF"
+        android:layout_marginBottom="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
     <Button
         android:id="@+id/btnEarnings"
         android:text="View Earnings"
+        android:backgroundTint="#112240"
+        android:textColor="#E6F1FF"
+        android:layout_marginBottom="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
@@ -46,7 +59,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:backgroundTint="#4CAF50"
+        android:backgroundTint="#0D47A1"
         android:textColor="#FFFFFF"/>
 
 </LinearLayout>

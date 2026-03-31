@@ -37,7 +37,7 @@ public class JobFeedActivity extends AppCompatActivity {
         }
 
         adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1, jobsList);
+                R.layout.list_item_white_text, jobsList);
         listView.setAdapter(adapter);
 
         // Apply job on click

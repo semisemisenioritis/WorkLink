@@ -87,7 +87,7 @@ public class VerifyActivity extends AppCompatActivity {
         cursor.close();
 
         listView.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1, bookingDisplayList));
+                R.layout.list_item_white_text, bookingDisplayList));
         
         if (bookingDisplayList.isEmpty()) {
             Toast.makeText(this, "No active bookings to verify.", Toast.LENGTH_SHORT).show();

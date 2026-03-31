@@ -60,7 +60,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
             cursor.close();
 
             listView.setAdapter(new ArrayAdapter<>(this,
-                    android.R.layout.simple_list_item_1, workerDisplayList));
+                    R.layout.list_item_white_text, workerDisplayList));
         });
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
