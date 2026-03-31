@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#A47496"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:text="Post a New Job"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:textColor="#F6EEEA"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="32dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#EAD7D1">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <EditText
+                        android:id="@+id/etTitle"
+                        android:hint="Job Title"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#A47496" android:layout_marginHorizontal="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etDesc"
+                        android:hint="Description"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#A47496" android:layout_marginHorizontal="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etLocation"
+                        android:hint="Location"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#A47496" android:layout_marginHorizontal="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etWage"
+                        android:hint="Wage (₹)"
+                        android:inputType="numberDecimal"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#A47496" android:layout_marginHorizontal="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etSkills"
+                        android:hint="Required Skills"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#A47496" android:layout_marginHorizontal="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etCount"
+                        android:hint="Number of Workers"
+                        android:inputType="number"
+                        android:background="@android:color/transparent"
+                        android:textColor="#000000"
+                        android:padding="14dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <Button
+                android:id="@+id/btnPost"
+                android:text="Post Job"
+                android:backgroundTint="#1F1A38"
+                android:textColor="#F6EEEA"
+                android:layout_marginTop="32dp"
+                android:padding="14dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
