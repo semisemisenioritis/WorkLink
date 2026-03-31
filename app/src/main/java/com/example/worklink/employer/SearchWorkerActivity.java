@@ -18,6 +18,7 @@ import com.example.worklink.R;
 public class SearchWorkerActivity extends AppCompatActivity {
 
     Spinner spJobs;
+    Button btnWithdrawJob;
     ListView listView;
     DBHelper dbHelper;
     ArrayList<String> workerDisplayList;
@@ -38,6 +39,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
         employerId = sharedPreferences.getInt("userId", -1);
 
         spJobs = findViewById(R.id.spJobs);
+        btnWithdrawJob = findViewById(R.id.btnWithdrawJob);
         listView = findViewById(R.id.listWorkers);
         dbHelper = new DBHelper(this);
 
@@ -47,15 +49,37 @@ public class SearchWorkerActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!jobIds.isEmpty()) {
-                    loadApplicants(jobIds.get(position));
+                    int selectedJobId = jobIds.get(position);
+                    btnWithdrawJob.setVisibility(View.VISIBLE);
+                    loadApplicants(selectedJobId);
+                } else {
+                    btnWithdrawJob.setVisibility(View.GONE);
                 }
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+                btnWithdrawJob.setVisibility(View.GONE);
+            }
+        });
+
+        btnWithdrawJob.setOnClickListener(v -> {
+            int position = spJobs.getSelectedItemPosition();
+            if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
+                int jobId = jobIds.get(position);
+                String jobTitle = jobTitles.get(position);
+                
+                new AlertDialog.Builder(this)
+                        .setTitle("Withdraw Job")
+                        .setMessage("Are you sure you want to withdraw the job: \"" + jobTitle + "\"? All accepted applications will be cancelled.")
+                        .setPositiveButton("Yes, Withdraw", (dialog, which) -> withdrawJob(jobId))
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
         });
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
+            if (workerIds.isEmpty()) return;
             int selectedWorkerId = workerIds.get(position);
             int selectedAppId = applicationIds.get(position);
             String selectedWorkerName = workerDisplayList.get(position).split(" \\| ")[0];
@@ -83,7 +107,6 @@ public class SearchWorkerActivity extends AppCompatActivity {
             String title = cursor.getString(1);
             int needed = cursor.getInt(2);
             
-            // Show how many slots are filled
             Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jId)});
             int filled = 0;
             if (countCursor.moveToFirst()) filled = countCursor.getInt(0);
@@ -96,6 +119,9 @@ public class SearchWorkerActivity extends AppCompatActivity {
 
         if (jobTitles.isEmpty()) {
             jobTitles.add("No Open Jobs Found");
+            btnWithdrawJob.setVisibility(View.GONE);
+        } else {
+            btnWithdrawJob.setVisibility(View.VISIBLE);
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
@@ -130,10 +156,6 @@ public class SearchWorkerActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 R.layout.list_item_white_text, workerDisplayList);
         listView.setAdapter(adapter);
-        
-        if (workerDisplayList.isEmpty() && !jobIds.isEmpty()) {
-            Toast.makeText(this, "No pending applicants for this job", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void acceptApplication(int appId, int workerId) {
@@ -145,17 +167,14 @@ public class SearchWorkerActivity extends AppCompatActivity {
         if (cursor.moveToFirst()) {
             int jobId = cursor.getInt(0);
 
-            // 1. Create Booking
             ContentValues bookingValues = new ContentValues();
             bookingValues.put("job_id", jobId);
             bookingValues.put("worker_id", workerId);
             bookingValues.put("status", "ACCEPTED");
             db.insert("bookings", null, bookingValues);
 
-            // 2. Update Application Status
             db.execSQL("UPDATE applications SET status='accepted' WHERE application_id=?", new Object[]{appId});
 
-            // 3. Check if all slots are filled
             Cursor jobCursor = db.rawQuery("SELECT workers_needed FROM jobs WHERE job_id=?", new String[]{String.valueOf(jobId)});
             if (jobCursor.moveToFirst()) {
                 int needed = jobCursor.getInt(0);
@@ -169,12 +188,11 @@ public class SearchWorkerActivity extends AppCompatActivity {
                     db.execSQL("UPDATE jobs SET status='FILLED' WHERE job_id=?", new Object[]{jobId});
                     Toast.makeText(this, "Job Fully Staffed and Closed!", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(this, "Applicant Accepted! " + (needed - filled) + " more needed.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Applicant Accepted!", Toast.LENGTH_SHORT).show();
                 }
             }
             jobCursor.close();
             
-            // Refresh
             loadEmployerJobs(); 
         }
         cursor.close();
@@ -188,5 +206,29 @@ public class SearchWorkerActivity extends AppCompatActivity {
         if (spJobs.getSelectedItemPosition() != AdapterView.INVALID_POSITION) {
             loadApplicants(jobIds.get(spJobs.getSelectedItemPosition()));
         }
+    }
+
+    private void withdrawJob(int jobId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        
+        db.beginTransaction();
+        try {
+            // 1. Mark Job as CLOSED/CANCELLED
+            db.execSQL("UPDATE jobs SET status='CANCELLED' WHERE job_id=?", new Object[]{jobId});
+            
+            // 2. Change all 'accepted' and 'pending' applications to 'cancelled'
+            db.execSQL("UPDATE applications SET status='cancelled' WHERE job_id=? AND (status='accepted' OR status='pending')", 
+                    new Object[]{jobId});
+            
+            // 3. Remove bookings for this job (optional, or mark them as cancelled)
+            db.execSQL("DELETE FROM bookings WHERE job_id=?", new Object[]{jobId});
+            
+            db.setTransactionSuccessful();
+            Toast.makeText(this, "Job Withdrawn Successfully", Toast.LENGTH_SHORT).show();
+        } finally {
+            db.endTransaction();
+        }
+        
+        loadEmployerJobs(); // Refresh spinner and list
     }
 }

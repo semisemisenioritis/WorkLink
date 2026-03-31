@@ -27,9 +27,19 @@
         android:id="@+id/spJobs"
         android:background="#112240"
         android:padding="12dp"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="12dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
+
+    <Button
+        android:id="@+id/btnWithdrawJob"
+        android:text="Withdraw Selected Job"
+        android:backgroundTint="#D32F2F"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="24dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"/>
 
     <ListView
         android:id="@+id/listWorkers"
