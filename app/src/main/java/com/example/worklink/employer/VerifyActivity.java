@@ -110,8 +110,8 @@ public class VerifyActivity extends AppCompatActivity {
 
             btnComplete.setOnClickListener(v -> {
                 SQLiteDatabase db = dbHelper.getWritableDatabase();
-                db.execSQL("UPDATE bookings SET status='COMPLETED' WHERE booking_id=?",
-                        new Object[]{item.bookingId});
+                db.execSQL("UPDATE bookings SET status='COMPLETED', actual_days=? WHERE booking_id=?",
+                        new Object[]{item.duration, item.bookingId});
 
                 Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
                 intent.putExtra("bookingId", item.bookingId);
@@ -155,8 +155,8 @@ public class VerifyActivity extends AppCompatActivity {
             double newTotal = daysWorked * item.dailyWage;
 
             SQLiteDatabase db = dbHelper.getWritableDatabase();
-            db.execSQL("UPDATE bookings SET status='TERMINATED' WHERE booking_id=?",
-                    new Object[]{item.bookingId});
+            db.execSQL("UPDATE bookings SET status='TERMINATED', actual_days=? WHERE booking_id=?",
+                    new Object[]{daysWorked, item.bookingId});
 
             Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
             intent.putExtra("bookingId", item.bookingId);

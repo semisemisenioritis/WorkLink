@@ -30,8 +30,10 @@ public class ResumeBuilder {
 
     public File generateResume(int workerId) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        // 1. Get Basic Info
         Cursor cursor = db.rawQuery(
-                "SELECT u.name, u.phone, w.skills, w.experience, w.rating " +
+                "SELECT u.name, u.phone, w.skills, w.rating " +
                 "FROM users u JOIN worker_profile w ON u.id = w.worker_id " +
                 "WHERE u.id = ?", new String[]{String.valueOf(workerId)});
 
@@ -40,82 +42,117 @@ public class ResumeBuilder {
             String name = cursor.getString(0);
             String phone = cursor.getString(1);
             String skills = cursor.getString(2);
-            int experience = cursor.getInt(3);
-            double rating = cursor.getDouble(4);
+            double rating = cursor.getDouble(3);
 
-            file = createPdf(name, phone, skills, experience, rating);
-        } else {
-            Toast.makeText(context, "Worker data not found", Toast.LENGTH_SHORT).show();
+            // 2. Start PDF Creation
+            PdfDocument pdfDocument = new PdfDocument();
+            Paint paint = new Paint();
+            Paint titlePaint = new Paint();
+
+            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
+            PdfDocument.Page page = pdfDocument.startPage(pageInfo);
+            Canvas canvas = page.getCanvas();
+
+            int y = 50;
+
+            // Title
+            titlePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            titlePaint.setTextSize(24);
+            titlePaint.setColor(Color.BLUE);
+            canvas.drawText("WORKLINK RESUME", 180, y, titlePaint);
+            y += 50;
+
+            // Name & Contact
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            paint.setTextSize(18);
+            canvas.drawText(name, 50, y, paint);
+            y += 30;
+            
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+            paint.setTextSize(14);
+            canvas.drawText("Phone: " + phone, 50, y, paint);
+            y += 25;
+            canvas.drawText("Rating: " + String.format(Locale.US, "%.1f", rating) + " / 5.0", 50, y, paint);
+            y += 40;
+
+            // Skills Section
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            canvas.drawText("CORE SKILLS", 50, y, paint);
+            y += 25;
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+            String[] skillArray = skills.split(",");
+            for (String skill : skillArray) {
+                canvas.drawText("• " + skill.trim(), 70, y, paint);
+                y += 20;
+            }
+            y += 30;
+
+            // Experience Section
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            canvas.drawText("WORK EXPERIENCE", 50, y, paint);
+            y += 30;
+
+            String expQuery = "SELECT j.title, j.description, j.location, j.job_date, " +
+                    "CASE WHEN b.actual_days IS NULL OR b.actual_days = 0 THEN j.duration_days ELSE b.actual_days END as duration, " +
+                    "b.status, j.required_skills " +
+                    "FROM bookings b " +
+                    "JOIN jobs j ON b.job_id = j.job_id " +
+                    "WHERE b.worker_id = ? AND (b.status = 'COMPLETED' OR b.status = 'TERMINATED') " +
+                    "ORDER BY j.job_date DESC";
+            
+            Cursor expCursor = db.rawQuery(expQuery, new String[]{String.valueOf(workerId)});
+            
+            if (expCursor.getCount() == 0) {
+                paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.ITALIC));
+                canvas.drawText("No verified work history found.", 70, y, paint);
+            } else {
+                while (expCursor.moveToNext()) {
+                    if (y > 750) break; // Simple page overflow protection
+
+                    String title = expCursor.getString(0);
+                    String desc = expCursor.getString(1);
+                    String loc = expCursor.getString(2);
+                    String date = expCursor.getString(3);
+                    int duration = expCursor.getInt(4);
+                    String jobSkills = expCursor.getString(6);
+
+                    paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+                    canvas.drawText(title + " | " + date, 70, y, paint);
+                    y += 20;
+                    
+                    paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+                    canvas.drawText("Skills: " + jobSkills, 70, y, paint);
+                    y += 20;
+                    
+                    canvas.drawText("Location: " + loc + " | Duration: " + duration + " days", 70, y, paint);
+                    y += 20;
+                    
+                    // Truncate description if too long for PDF line
+                    String d = desc.length() > 60 ? desc.substring(0, 57) + "..." : desc;
+                    canvas.drawText("Description: " + d, 70, y, paint);
+                    y += 40;
+                }
+            }
+            expCursor.close();
+
+            // Footer
+            paint.setTextSize(10);
+            paint.setColor(Color.GRAY);
+            canvas.drawText("Generated by WorkLink - Professional Service Platform", 180, 810, paint);
+
+            pdfDocument.finishPage(page);
+            file = new File(context.getExternalFilesDir(null), name.replace(" ", "_") + "_Resume.pdf");
+
+            try {
+                pdfDocument.writeTo(new FileOutputStream(file));
+            } catch (IOException e) {
+                e.printStackTrace();
+                return null;
+            } finally {
+                pdfDocument.close();
+            }
         }
         cursor.close();
-        return file;
-    }
-
-    private File createPdf(String name, String phone, String skills, int experience, double rating) {
-        PdfDocument pdfDocument = new PdfDocument();
-        Paint paint = new Paint();
-        Paint titlePaint = new Paint();
-
-        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
-        PdfDocument.Page page = pdfDocument.startPage(pageInfo);
-        Canvas canvas = page.getCanvas();
-
-        // Title
-        titlePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        titlePaint.setTextSize(24);
-        titlePaint.setColor(Color.BLUE);
-        canvas.drawText("WORKLINK RESUME", 180, 50, titlePaint);
-
-        // Name
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        paint.setTextSize(18);
-        canvas.drawText("Name: " + name, 50, 100, paint);
-
-        // Contact
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
-        paint.setTextSize(14);
-        canvas.drawText("Contact: " + phone, 50, 130, paint);
-
-        // Experience
-        canvas.drawText("Experience: " + experience + " years", 50, 160, paint);
-
-        // Rating (Formatted to 2 decimal places)
-        String ratingStr = String.format(Locale.US, "%.2f", rating);
-        canvas.drawText("Overall Rating: " + ratingStr + " / 5.0", 50, 190, paint);
-
-        // Skills Header
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        canvas.drawText("Skills:", 50, 240, paint);
-
-        // Skills List (Simple wrapping logic)
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
-        String[] skillArray = skills.split(",");
-        int y = 270;
-        for (String skill : skillArray) {
-            canvas.drawText("• " + skill.trim(), 70, y, paint);
-            y += 25;
-        }
-
-        // Footer
-        paint.setTextSize(10);
-        paint.setColor(Color.GRAY);
-        canvas.drawText("Generated by WorkLink App", 220, 800, paint);
-
-        pdfDocument.finishPage(page);
-
-        // Save file
-        File file = new File(context.getExternalFilesDir(null), name.replace(" ", "_") + "_Resume.pdf");
-
-        try {
-            pdfDocument.writeTo(new FileOutputStream(file));
-        } catch (IOException e) {
-            e.printStackTrace();
-            Toast.makeText(context, "Error generating PDF: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            return null;
-        } finally {
-            pdfDocument.close();
-        }
-
         return file;
     }
 }

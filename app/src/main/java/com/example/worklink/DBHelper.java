@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class DBHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "WorkLinkDB";
-    public static final int DB_VERSION = 5; // Updated to 5 for new application statuses
+    public static final int DB_VERSION = 6; // Updated to 6 for actual_days in bookings
 
     public DBHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -20,7 +20,7 @@ public class DBHelper extends SQLiteOpenHelper {
         
         db.execSQL("CREATE TABLE jobs (job_id INTEGER PRIMARY KEY AUTOINCREMENT, employer_id INTEGER, title TEXT, description TEXT, location TEXT, wage REAL, required_skills TEXT, workers_needed INTEGER DEFAULT 1, duration_days INTEGER DEFAULT 1, job_date DATE, status TEXT DEFAULT 'OPEN', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(employer_id) REFERENCES users(id))");
         
-        db.execSQL("CREATE TABLE bookings (booking_id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, worker_id INTEGER, status TEXT DEFAULT 'PENDING', check_in_time DATETIME, check_out_time DATETIME, FOREIGN KEY(job_id) REFERENCES jobs(job_id), FOREIGN KEY(worker_id) REFERENCES users(id))");
+        db.execSQL("CREATE TABLE bookings (booking_id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, worker_id INTEGER, status TEXT DEFAULT 'PENDING', actual_days INTEGER, check_in_time DATETIME, check_out_time DATETIME, FOREIGN KEY(job_id) REFERENCES jobs(job_id), FOREIGN KEY(worker_id) REFERENCES users(id))");
         db.execSQL("CREATE TABLE ratings (rating_id INTEGER PRIMARY KEY AUTOINCREMENT, booking_id INTEGER, given_by INTEGER, given_to INTEGER, rating INTEGER CHECK(rating BETWEEN 1 AND 5), review TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(booking_id) REFERENCES bookings(booking_id))");
         db.execSQL("CREATE TABLE payments (payment_id INTEGER PRIMARY KEY AUTOINCREMENT, booking_id INTEGER, amount REAL, payment_status TEXT DEFAULT 'PENDING', payment_method TEXT, payment_date DATETIME, FOREIGN KEY(booking_id) REFERENCES bookings(booking_id))");
         
@@ -55,12 +55,6 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE jobs ADD COLUMN duration_days INTEGER DEFAULT 1");
         }
         if (oldVersion < 5) {
-            // SQLite doesn't support easy ALTER TABLE for CHECK constraints.
-            // For simplicity in this environment, we'll recreate the applications table if needed,
-            // but usually we'd rename, create new, copy, and drop.
-            // Since we just want to add 'cancelled' and 'withdrawn', we can try to just use them, 
-            // but the CHECK constraint will fail on older versions.
-            // Let's do a proper migration for the CHECK constraint.
             db.execSQL("ALTER TABLE applications RENAME TO applications_old");
             db.execSQL("CREATE TABLE applications (" +
                     "application_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -74,6 +68,9 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("INSERT INTO applications (application_id, job_id, worker_id, status, applied_at, message) " +
                     "SELECT application_id, job_id, worker_id, status, applied_at, message FROM applications_old");
             db.execSQL("DROP TABLE applications_old");
+        }
+        if (oldVersion < 6) {
+            db.execSQL("ALTER TABLE bookings ADD COLUMN actual_days INTEGER");
         }
     }
 }
