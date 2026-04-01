@@ -12,8 +12,8 @@ def send_otp(email: str):
     otp = str(random.randint(100000,999999))
     otp_store[email] = otp
 
-    sender = "divyangisingh2004@gmail.com"
-    password = "uvydfscycynjverc"
+    sender = "divyangisingh2004@gmail.com" # email to send otp from
+    password = "uvydfscycynjverc" # 16 letter password [current example revoked before commit]
 
     message = f"Subject: Your OTP\n\nYour OTP is {otp}"
 
