@@ -31,15 +31,31 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnWithdrawJob"
-        android:text="Withdraw Selected Job"
-        android:backgroundTint="#D32F2F"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="24dp"
+    <LinearLayout
+        android:id="@+id/layoutJobActions"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:visibility="gone"/>
+        android:visibility="gone"
+        android:layout_marginBottom="24dp">
+
+        <Button
+            android:id="@+id/btnConfirmBooking"
+            android:text="Confirm Booking Now"
+            android:backgroundTint="#4CAF50"
+            android:textColor="#FFFFFF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnWithdrawJob"
+            android:text="Withdraw Job"
+            android:backgroundTint="#D32F2F"
+            android:textColor="#FFFFFF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
 
     <ListView
         android:id="@+id/listWorkers"

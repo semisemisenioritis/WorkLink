@@ -18,7 +18,8 @@ import com.example.worklink.R;
 public class SearchWorkerActivity extends AppCompatActivity {
 
     Spinner spJobs;
-    Button btnWithdrawJob;
+    Button btnWithdrawJob, btnConfirmBooking;
+    LinearLayout layoutJobActions;
     ListView listView;
     DBHelper dbHelper;
     ArrayList<String> workerDisplayList;
@@ -40,6 +41,8 @@ public class SearchWorkerActivity extends AppCompatActivity {
 
         spJobs = findViewById(R.id.spJobs);
         btnWithdrawJob = findViewById(R.id.btnWithdrawJob);
+        btnConfirmBooking = findViewById(R.id.btnConfirmBooking);
+        layoutJobActions = findViewById(R.id.layoutJobActions);
         listView = findViewById(R.id.listWorkers);
         dbHelper = new DBHelper(this);
 
@@ -50,16 +53,17 @@ public class SearchWorkerActivity extends AppCompatActivity {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!jobIds.isEmpty()) {
                     int selectedJobId = jobIds.get(position);
-                    btnWithdrawJob.setVisibility(View.VISIBLE);
+                    layoutJobActions.setVisibility(View.VISIBLE);
+                    updateActionButtons(selectedJobId);
                     loadApplicants(selectedJobId);
                 } else {
-                    btnWithdrawJob.setVisibility(View.GONE);
+                    layoutJobActions.setVisibility(View.GONE);
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                btnWithdrawJob.setVisibility(View.GONE);
+                layoutJobActions.setVisibility(View.GONE);
             }
         });
 
@@ -78,6 +82,14 @@ public class SearchWorkerActivity extends AppCompatActivity {
             }
         });
 
+        btnConfirmBooking.setOnClickListener(v -> {
+            int position = spJobs.getSelectedItemPosition();
+            if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
+                int jobId = jobIds.get(position);
+                confirmBooking(jobId);
+            }
+        });
+
         listView.setOnItemClickListener((parent, view, position, id) -> {
             if (workerIds.isEmpty()) return;
             int selectedWorkerId = workerIds.get(position);
@@ -92,6 +104,23 @@ public class SearchWorkerActivity extends AppCompatActivity {
                     .setNeutralButton("Cancel", null)
                     .show();
         });
+    }
+
+    private void updateActionButtons(int jobId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jobId)});
+        int acceptedCount = 0;
+        if (cursor.moveToFirst()) acceptedCount = cursor.getInt(0);
+        cursor.close();
+
+        // Enable confirm button only if at least one worker is accepted
+        if (acceptedCount > 0) {
+            btnConfirmBooking.setEnabled(true);
+            btnConfirmBooking.setAlpha(1.0f);
+        } else {
+            btnConfirmBooking.setEnabled(false);
+            btnConfirmBooking.setAlpha(0.5f); // Visually indicate disabled
+        }
     }
 
     private void loadEmployerJobs() {
@@ -119,9 +148,16 @@ public class SearchWorkerActivity extends AppCompatActivity {
 
         if (jobTitles.isEmpty()) {
             jobTitles.add("No Open Jobs Found");
-            btnWithdrawJob.setVisibility(View.GONE);
+            layoutJobActions.setVisibility(View.GONE);
         } else {
-            btnWithdrawJob.setVisibility(View.VISIBLE);
+            layoutJobActions.setVisibility(View.VISIBLE);
+            // After loading, ensure the buttons reflect the current selection
+            int position = spJobs.getSelectedItemPosition();
+            if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
+                updateActionButtons(jobIds.get(position));
+            } else if (!jobIds.isEmpty()) {
+                updateActionButtons(jobIds.get(0));
+            }
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
@@ -136,7 +172,6 @@ public class SearchWorkerActivity extends AppCompatActivity {
         applicationIds = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
 
-        // Updated query to hide applications if worker is not available
         String query = "SELECT a.application_id, u.id, u.name, w.skills, w.rating FROM applications a " +
                 "JOIN users u ON a.worker_id = u.id " +
                 "JOIN worker_profile w ON u.id = w.worker_id " +
@@ -194,7 +229,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
             }
             jobCursor.close();
             
-            loadEmployerJobs(); 
+            loadEmployerJobs(); // This will refresh the spinner and the buttons
         }
         cursor.close();
     }
@@ -214,22 +249,61 @@ public class SearchWorkerActivity extends AppCompatActivity {
         
         db.beginTransaction();
         try {
-            // 1. Mark Job as CLOSED/CANCELLED
             db.execSQL("UPDATE jobs SET status='CANCELLED' WHERE job_id=?", new Object[]{jobId});
-            
-            // 2. Change all 'accepted' and 'pending' applications to 'cancelled'
             db.execSQL("UPDATE applications SET status='cancelled' WHERE job_id=? AND (status='accepted' OR status='pending')", 
                     new Object[]{jobId});
-            
-            // 3. Remove bookings for this job (optional, or mark them as cancelled)
             db.execSQL("DELETE FROM bookings WHERE job_id=?", new Object[]{jobId});
-            
             db.setTransactionSuccessful();
             Toast.makeText(this, "Job Withdrawn Successfully", Toast.LENGTH_SHORT).show();
         } finally {
             db.endTransaction();
         }
         
-        loadEmployerJobs(); // Refresh spinner and list
+        loadEmployerJobs(); 
+    }
+
+    private void confirmBooking(int jobId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        // Count already accepted applicants
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jobId)});
+        int acceptedCount = 0;
+        if (cursor.moveToFirst()) acceptedCount = cursor.getInt(0);
+        cursor.close();
+
+        // Extra safety check: Don't allow continuing with 0 workers
+        if (acceptedCount == 0) {
+            Toast.makeText(this, "You cannot confirm a booking with 0 accepted workers.", Toast.LENGTH_SHORT).show();
+            updateActionButtons(jobId); // Force re-sync UI
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Confirm Booking")
+                .setMessage("Continue with " + acceptedCount + " workers?")
+                .setPositiveButton("Yes", (dialog, which) -> finalizeBooking(jobId))
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    private void finalizeBooking(int jobId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        
+        db.beginTransaction();
+        try {
+            // 1. Mark Job as FILLED/CLOSED even if original capacity wasn't reached
+            db.execSQL("UPDATE jobs SET status='FILLED' WHERE job_id=?", new Object[]{jobId});
+            
+            // 2. Reject all remaining 'pending' applications for this job
+            db.execSQL("UPDATE applications SET status='rejected' WHERE job_id=? AND status='pending'", 
+                    new Object[]{jobId});
+            
+            db.setTransactionSuccessful();
+            Toast.makeText(this, "Booking Confirmed. Job Closed.", Toast.LENGTH_SHORT).show();
+        } finally {
+            db.endTransaction();
+        }
+        
+        loadEmployerJobs(); // Refresh UI
     }
 }
