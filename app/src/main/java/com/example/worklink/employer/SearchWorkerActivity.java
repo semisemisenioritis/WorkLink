@@ -136,10 +136,11 @@ public class SearchWorkerActivity extends AppCompatActivity {
         applicationIds = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
 
+        // Updated query to hide applications if worker is not available
         String query = "SELECT a.application_id, u.id, u.name, w.skills, w.rating FROM applications a " +
                 "JOIN users u ON a.worker_id = u.id " +
                 "JOIN worker_profile w ON u.id = w.worker_id " +
-                "WHERE a.job_id = ? AND a.status = 'pending'";
+                "WHERE a.job_id = ? AND a.status = 'pending' AND w.availability = 1";
 
         Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(jobId)});
 

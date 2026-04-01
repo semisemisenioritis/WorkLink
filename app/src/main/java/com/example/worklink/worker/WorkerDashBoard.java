@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.*;
@@ -39,6 +40,9 @@ public class WorkerDashBoard extends AppCompatActivity {
 
         dbHelper = new DBHelper(this);
 
+        // Load initial state
+        loadAvailabilityState();
+
         // Toggle availability
         availabilitySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             SQLiteDatabase db = dbHelper.getWritableDatabase();
@@ -49,7 +53,16 @@ public class WorkerDashBoard extends AppCompatActivity {
             db.update("worker_profile", values, "worker_id=?",
                     new String[]{String.valueOf(workerId)});
 
-            Toast.makeText(this, "Availability Updated", Toast.LENGTH_SHORT).show();
+            if (isChecked) {
+                // Logic: Once turned ON, if the job post is no longer 'OPEN', mark the application as 'withdrawn'
+                // This cleans up stale applications while keeping active ones visible.
+                String cleanupQuery = "UPDATE applications SET status = 'withdrawn' " +
+                        "WHERE worker_id = ? AND status = 'pending' AND job_id IN " +
+                        "(SELECT job_id FROM jobs WHERE status != 'OPEN')";
+                db.execSQL(cleanupQuery, new Object[]{workerId});
+            }
+
+            Toast.makeText(this, isChecked ? "You are now visible to employers" : "Applications Hidden", Toast.LENGTH_SHORT).show();
         });
 
         // Open Job Feed
@@ -90,5 +103,16 @@ public class WorkerDashBoard extends AppCompatActivity {
             startActivity(intent);
             finish();
         });
+    }
+
+    private void loadAvailabilityState() {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT availability FROM worker_profile WHERE worker_id=?",
+                new String[]{String.valueOf(workerId)});
+        if (cursor.moveToFirst()) {
+            int availability = cursor.getInt(0);
+            availabilitySwitch.setChecked(availability == 1);
+        }
+        cursor.close();
     }
 }
