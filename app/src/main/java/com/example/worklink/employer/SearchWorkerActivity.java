@@ -55,6 +55,9 @@ public class SearchWorkerActivity extends AppCompatActivity {
         cbSortRating = findViewById(R.id.cbSortRating);
         chipGroupSkills = findViewById(R.id.chipGroupSkills);
         listView = findViewById(R.id.listWorkers);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         dbHelper = new DBHelper(this);
 
         loadEmployerJobs();

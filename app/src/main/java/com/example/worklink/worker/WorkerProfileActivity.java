@@ -33,6 +33,8 @@ public class WorkerProfileActivity extends AppCompatActivity {
         etSkills = findViewById(R.id.etSkills);
         tvCurrentSkills = findViewById(R.id.tvCurrentSkills);
         btnAddSkill = findViewById(R.id.btnAddSkill);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
         

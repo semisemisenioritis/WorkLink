@@ -37,6 +37,8 @@ public class WorkerDashBoard extends AppCompatActivity {
         earnings = findViewById(R.id.btnEarnings);
         btnResume = findViewById(R.id.btnViewResume);
         logout = findViewById(R.id.btnLogout);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
 

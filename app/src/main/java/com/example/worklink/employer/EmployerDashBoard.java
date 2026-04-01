@@ -23,6 +23,8 @@ public class EmployerDashBoard extends AppCompatActivity {
         verify = findViewById(R.id.btnVerify);
         logout = findViewById(R.id.btnLogout);
 
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         searchWorkers.setOnClickListener(v ->
                 startActivity(new Intent(this, SearchWorkerActivity.class)));
 

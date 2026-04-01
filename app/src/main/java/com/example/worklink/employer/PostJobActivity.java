@@ -40,6 +40,8 @@ public class PostJobActivity extends AppCompatActivity {
         count = findViewById(R.id.etCount);
         dateInput = findViewById(R.id.etDate);
         post = findViewById(R.id.btnPost);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
 

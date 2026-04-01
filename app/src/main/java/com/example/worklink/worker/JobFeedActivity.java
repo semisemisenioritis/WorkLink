@@ -32,6 +32,9 @@ public class JobFeedActivity extends AppCompatActivity {
         workerId = sharedPreferences.getInt("userId", -1);
 
         listView = findViewById(R.id.jobListView);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         dbHelper = new DBHelper(this);
         jobsList = new ArrayList<>();
         jobIds = new ArrayList<>();

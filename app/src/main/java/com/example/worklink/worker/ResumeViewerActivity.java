@@ -31,6 +31,9 @@ public class ResumeViewerActivity extends AppCompatActivity {
 
         tvPreview = findViewById(R.id.tvResumePreview);
         btnDownload = findViewById(R.id.btnDownloadPdf);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         dbHelper = new DBHelper(this);
 
         loadResumePreview();

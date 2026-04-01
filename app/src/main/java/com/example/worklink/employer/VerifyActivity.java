@@ -35,6 +35,9 @@ public class VerifyActivity extends AppCompatActivity {
         employerId = sharedPreferences.getInt("userId", -1);
 
         listView = findViewById(R.id.jobListView);
+        
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         dbHelper = new DBHelper(this);
         verifyItems = new ArrayList<>();
         

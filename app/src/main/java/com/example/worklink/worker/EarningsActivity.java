@@ -49,6 +49,8 @@ public class EarningsActivity extends AppCompatActivity {
         btnDateRange = findViewById(R.id.btnDateRange);
         btnClear = findViewById(R.id.btnClearFilter);
         
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        
         dbHelper = new DBHelper(this);
 
         btnDateRange.setOnClickListener(v -> showDateRangePicker());
