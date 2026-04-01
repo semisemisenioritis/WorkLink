@@ -5,9 +5,10 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
-import android.widget.Toast;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -20,9 +21,9 @@ public class ApplicationsActivity extends AppCompatActivity {
 
     ListView listView;
     DBHelper dbHelper;
-    ArrayList<String> applicationList;
-    ArrayList<Integer> applicationIds;
-    ArrayList<String> applicationStatuses;
+    ArrayList<ApplicationItem> applicationItems;
+    ApplicationAdapter adapter;
+    ImageButton btnBack;
     int workerId;
 
     @Override
@@ -34,38 +35,17 @@ public class ApplicationsActivity extends AppCompatActivity {
         workerId = sharedPreferences.getInt("userId", -1);
 
         listView = findViewById(R.id.lvApplications);
+        btnBack = findViewById(R.id.btnBack);
         dbHelper = new DBHelper(this);
-        applicationList = new ArrayList<>();
-        applicationIds = new ArrayList<>();
-        applicationStatuses = new ArrayList<>();
+        applicationItems = new ArrayList<>();
+
+        btnBack.setOnClickListener(v -> finish());
 
         loadApplications();
-
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            if (applicationIds.isEmpty()) return;
-            
-            int appId = applicationIds.get(position);
-            String status = applicationStatuses.get(position);
-
-            if (status.equals("pending")) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Withdraw Application")
-                        .setMessage("Are you sure you want to withdraw this application?")
-                        .setPositiveButton("Yes", (dialog, which) -> withdrawApplication(appId))
-                        .setNegativeButton("No", null)
-                        .show();
-            } else if (status.equals("withdrawn")) {
-                Toast.makeText(this, "This application has already been withdrawn", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Cannot withdraw an application that is " + status, Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 
     private void loadApplications() {
-        applicationList.clear();
-        applicationIds.clear();
-        applicationStatuses.clear();
+        applicationItems.clear();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
 
         String query = "SELECT j.title, a.status, a.applied_at, a.application_id FROM applications a " +
@@ -76,26 +56,16 @@ public class ApplicationsActivity extends AppCompatActivity {
         Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(workerId)});
 
         while (cursor.moveToNext()) {
-            String title = cursor.getString(0);
-            String status = cursor.getString(1);
-            String date = cursor.getString(2);
-            int id = cursor.getInt(3);
-
-            applicationIds.add(id);
-            applicationStatuses.add(status);
-
-            String displayStatus = status.substring(0, 1).toUpperCase() + status.substring(1);
-            String entry = "Job: " + title + "\nStatus: " + displayStatus + "\nApplied on: " + date;
-            applicationList.add(entry);
+            applicationItems.add(new ApplicationItem(
+                cursor.getInt(3),
+                cursor.getString(0),
+                cursor.getString(1),
+                cursor.getString(2)
+            ));
         }
         cursor.close();
 
-        if (applicationList.isEmpty()) {
-            applicationList.add("No applications found.");
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                R.layout.list_item_white_text, applicationList);
+        adapter = new ApplicationAdapter(this, applicationItems);
         listView.setAdapter(adapter);
     }
 
@@ -104,5 +74,56 @@ public class ApplicationsActivity extends AppCompatActivity {
         db.execSQL("UPDATE applications SET status='withdrawn' WHERE application_id=?", new Object[]{appId});
         Toast.makeText(this, "Application Withdrawn", Toast.LENGTH_SHORT).show();
         loadApplications();
+    }
+
+    // Data class for applications
+    static class ApplicationItem {
+        int id;
+        String title, status, date;
+
+        ApplicationItem(int id, String title, String status, String date) {
+            this.id = id;
+            this.title = title;
+            this.status = status;
+            this.date = date;
+        }
+    }
+
+    // Custom Adapter to handle the Withdraw button
+    private class ApplicationAdapter extends ArrayAdapter<ApplicationItem> {
+        ApplicationAdapter(Context context, ArrayList<ApplicationItem> items) {
+            super(context, 0, items);
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = LayoutInflater.from(getContext()).inflate(R.layout.list_item_application, parent, false);
+            }
+
+            ApplicationItem item = getItem(position);
+            TextView info = convertView.findViewById(R.id.tvAppInfo);
+            Button btnWithdraw = convertView.findViewById(R.id.btnWithdraw);
+
+            String displayStatus = item.status.substring(0, 1).toUpperCase() + item.status.substring(1);
+            info.setText("Job: " + item.title + "\nStatus: " + displayStatus + "\nApplied on: " + item.date);
+
+            // Show withdraw button only for pending applications
+            if (item.status.equals("pending")) {
+                btnWithdraw.setVisibility(View.VISIBLE);
+                btnWithdraw.setOnClickListener(v -> {
+                    new AlertDialog.Builder(getContext())
+                            .setTitle("Withdraw Application")
+                            .setMessage("Are you sure you want to withdraw this application?")
+                            .setPositiveButton("Yes", (dialog, which) -> withdrawApplication(item.id))
+                            .setNegativeButton("No", null)
+                            .show();
+                });
+            } else {
+                btnWithdraw.setVisibility(View.GONE);
+            }
+
+            return convertView;
+        }
     }
 }

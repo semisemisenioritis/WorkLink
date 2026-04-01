@@ -2,4 +2,19 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Professional Blue Palette -->
+    <color name="primary_blue">#1E88E5</color>
+    <color name="primary_dark_blue">#0D47A1</color>
+    <color name="primary_light_blue">#6AB7FF</color>
+
+    <color name="secondary_blue">#26C6DA</color>
+
+    <!-- Backgrounds -->
+    <color name="dark_background">#0A192F</color>
+    <color name="dark_surface">#112240</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#E6F1FF</color>
+    <color name="text_secondary">#8892B0</color>
 </resources>
