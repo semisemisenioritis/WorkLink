@@ -40,8 +40,6 @@ public class PaymentRatingActivity extends AppCompatActivity {
         ratingBar = findViewById(R.id.ratingBar);
         submit = findViewById(R.id.btnSubmit);
         
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-        
         amount.setText(String.valueOf(suggestedAmount));
         
         dbHelper = new DBHelper(this);

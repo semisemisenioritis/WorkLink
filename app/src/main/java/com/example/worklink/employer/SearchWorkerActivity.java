@@ -24,6 +24,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
 
     Spinner spJobs;
     Button btnWithdrawJob, btnConfirmBooking;
+    ImageButton btnBack;
     LinearLayout layoutJobActions, layoutFilters;
     CheckBox cbSortRating;
     ChipGroup chipGroupSkills;
@@ -47,6 +48,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         employerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         spJobs = findViewById(R.id.spJobs);
         btnWithdrawJob = findViewById(R.id.btnWithdrawJob);
         btnConfirmBooking = findViewById(R.id.btnConfirmBooking);
@@ -55,17 +57,16 @@ public class SearchWorkerActivity extends AppCompatActivity {
         cbSortRating = findViewById(R.id.cbSortRating);
         chipGroupSkills = findViewById(R.id.chipGroupSkills);
         listView = findViewById(R.id.listWorkers);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
         dbHelper = new DBHelper(this);
+
+        btnBack.setOnClickListener(v -> finish());
 
         loadEmployerJobs();
 
         spJobs.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!jobIds.isEmpty()) {
+                if (!jobIds.isEmpty() && !jobTitles.get(position).equals("No Open Jobs Found")) {
                     int selectedJobId = jobIds.get(position);
                     String skills = jobSkills.get(position);
                     
@@ -78,6 +79,8 @@ public class SearchWorkerActivity extends AppCompatActivity {
                 } else {
                     layoutJobActions.setVisibility(View.GONE);
                     layoutFilters.setVisibility(View.GONE);
+                    currentWorkerRecords.clear();
+                    applyFiltersAndSort();
                 }
             }
 
@@ -196,11 +199,11 @@ public class SearchWorkerActivity extends AppCompatActivity {
     }
 
     private void applyFiltersAndSort() {
-        ArrayList<WorkerRecord> filteredList = new HashSet<>(currentWorkerRecords).size() > 0 ? new ArrayList<>() : new ArrayList<>();
+        ArrayList<WorkerRecord> filteredList = new ArrayList<>();
         
         for (WorkerRecord w : currentWorkerRecords) {
             boolean match = true;
-            String workerSkills = w.skills.toLowerCase();
+            String workerSkills = (w.skills != null ? w.skills.toLowerCase() : "");
             for (String s : selectedFilterSkills) {
                 if (!workerSkills.contains(s)) {
                     match = false;
@@ -220,7 +223,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
                 View v = super.getView(pos, convert, parent);
                 TextView tv = (TextView) v.findViewById(android.R.id.text1);
                 WorkerRecord w = getItem(pos);
-                tv.setText(w.name + " | " + w.skills + " | ⭐" + w.rating);
+                tv.setText(w.name + " | " + (w.skills != null ? w.skills : "No skills") + " | ⭐" + String.format("%.1f", w.rating));
                 return v;
             }
         };
@@ -268,7 +271,10 @@ public class SearchWorkerActivity extends AppCompatActivity {
 
     private void rejectApplication(int appId) {
         dbHelper.getWritableDatabase().execSQL("UPDATE applications SET status='rejected' WHERE application_id=?", new Object[]{appId});
-        loadApplicants(jobIds.get(spJobs.getSelectedItemPosition()));
+        int position = spJobs.getSelectedItemPosition();
+        if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
+            loadApplicants(jobIds.get(position));
+        }
     }
 
     private void withdrawJob(int jobId) {

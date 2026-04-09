@@ -17,6 +17,7 @@ import java.util.ArrayList;
 public class JobFeedActivity extends AppCompatActivity {
 
     ListView listView;
+    ImageButton btnBack;
     DBHelper dbHelper;
     ArrayList<String> jobsList;
     ArrayList<Integer> jobIds;
@@ -31,13 +32,13 @@ public class JobFeedActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         listView = findViewById(R.id.jobListView);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
         dbHelper = new DBHelper(this);
         jobsList = new ArrayList<>();
         jobIds = new ArrayList<>();
+
+        btnBack.setOnClickListener(v -> finish());
 
         loadJobs();
 

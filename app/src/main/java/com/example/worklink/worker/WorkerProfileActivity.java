@@ -18,6 +18,7 @@ public class WorkerProfileActivity extends AppCompatActivity {
     EditText etSkills;
     TextView tvCurrentSkills;
     Button btnAddSkill;
+    ImageButton btnBack;
     DBHelper dbHelper;
     int workerId;
 
@@ -30,13 +31,14 @@ public class WorkerProfileActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         etSkills = findViewById(R.id.etSkills);
         tvCurrentSkills = findViewById(R.id.tvCurrentSkills);
         btnAddSkill = findViewById(R.id.btnAddSkill);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
+
+        btnBack.setOnClickListener(v -> finish());
         
         loadProfileData();
 

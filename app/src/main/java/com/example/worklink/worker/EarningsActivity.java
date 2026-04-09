@@ -10,7 +10,6 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.util.Pair;
 import com.google.android.material.datepicker.MaterialDatePicker;
-import com.google.android.material.datepicker.MaterialPickerOnPositiveButtonClickListener;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -25,6 +24,7 @@ public class EarningsActivity extends AppCompatActivity {
     DBHelper dbHelper;
     TextView earningsText, ratingText, tvSelectedRange;
     Button btnDateRange, btnClear;
+    ImageButton btnBack;
     ListView reviewsList;
     int workerId;
 
@@ -42,6 +42,7 @@ public class EarningsActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         earningsText = findViewById(R.id.tvEarnings);
         ratingText = findViewById(R.id.tvOverallRating);
         tvSelectedRange = findViewById(R.id.tvSelectedRange);
@@ -49,10 +50,9 @@ public class EarningsActivity extends AppCompatActivity {
         btnDateRange = findViewById(R.id.btnDateRange);
         btnClear = findViewById(R.id.btnClearFilter);
         
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-        
         dbHelper = new DBHelper(this);
 
+        btnBack.setOnClickListener(v -> finish());
         btnDateRange.setOnClickListener(v -> showDateRangePicker());
         
         btnClear.setOnClickListener(v -> {

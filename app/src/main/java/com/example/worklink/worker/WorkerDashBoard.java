@@ -18,6 +18,7 @@ public class WorkerDashBoard extends AppCompatActivity {
 
     SwitchCompat availabilitySwitch;
     Button jobFeed, profile, earnings, btnResume, btnApplications, logout;
+    ImageButton btnBack;
     DBHelper dbHelper;
     int workerId;
 
@@ -30,6 +31,7 @@ public class WorkerDashBoard extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         availabilitySwitch = findViewById(R.id.switchAvailability);
         jobFeed = findViewById(R.id.btnJobFeed);
         btnApplications = findViewById(R.id.btnApplications);
@@ -37,10 +39,18 @@ public class WorkerDashBoard extends AppCompatActivity {
         earnings = findViewById(R.id.btnEarnings);
         btnResume = findViewById(R.id.btnViewResume);
         logout = findViewById(R.id.btnLogout);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
+
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> {
+                // Return to Login
+                Intent intent = new Intent(WorkerDashBoard.this, LoginActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
+            });
+        }
 
         // Load initial state
         loadAvailabilityState();

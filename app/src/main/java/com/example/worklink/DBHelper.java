@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class DBHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "WorkLinkDB";
-    public static final int DB_VERSION = 7; // Updated to 7 for email column
+    public static final int DB_VERSION = 6; // Updated to 6 for actual_days in bookings
 
     public DBHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -14,9 +14,9 @@ public class DBHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT, phone TEXT UNIQUE, username TEXT UNIQUE, password TEXT NOT NULL, role TEXT CHECK(role IN ('Worker','Employer')), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-        db.execSQL("CREATE TABLE worker_profile (worker_id INTEGER PRIMARY KEY, email TEXT, skills TEXT, experience INTEGER, availability INTEGER DEFAULT 1, rating REAL DEFAULT 0, total_jobs INTEGER DEFAULT 0, FOREIGN KEY(worker_id) REFERENCES users(id))");
-        db.execSQL("CREATE TABLE employer_profile (employer_id INTEGER PRIMARY KEY, email TEXT, company_name TEXT, location TEXT, rating REAL DEFAULT 0, total_jobs_posted INTEGER DEFAULT 0, FOREIGN KEY(employer_id) REFERENCES users(id))");
+        db.execSQL("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, username TEXT UNIQUE, password TEXT NOT NULL, role TEXT CHECK(role IN ('Worker','Employer')), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+        db.execSQL("CREATE TABLE worker_profile (worker_id INTEGER PRIMARY KEY, skills TEXT, experience INTEGER, availability INTEGER DEFAULT 1, rating REAL DEFAULT 0, total_jobs INTEGER DEFAULT 0, FOREIGN KEY(worker_id) REFERENCES users(id))");
+        db.execSQL("CREATE TABLE employer_profile (employer_id INTEGER PRIMARY KEY, company_name TEXT, location TEXT, rating REAL DEFAULT 0, total_jobs_posted INTEGER DEFAULT 0, FOREIGN KEY(employer_id) REFERENCES users(id))");
         
         db.execSQL("CREATE TABLE jobs (job_id INTEGER PRIMARY KEY AUTOINCREMENT, employer_id INTEGER, title TEXT, description TEXT, location TEXT, wage REAL, required_skills TEXT, workers_needed INTEGER DEFAULT 1, duration_days INTEGER DEFAULT 1, job_date DATE, status TEXT DEFAULT 'OPEN', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(employer_id) REFERENCES users(id))");
         
@@ -71,11 +71,6 @@ public class DBHelper extends SQLiteOpenHelper {
         }
         if (oldVersion < 6) {
             db.execSQL("ALTER TABLE bookings ADD COLUMN actual_days INTEGER");
-        }
-        if (oldVersion < 7) {
-            db.execSQL("ALTER TABLE users ADD COLUMN email TEXT");
-            db.execSQL("ALTER TABLE worker_profile ADD COLUMN email TEXT");
-            db.execSQL("ALTER TABLE employer_profile ADD COLUMN email TEXT");
         }
     }
 }

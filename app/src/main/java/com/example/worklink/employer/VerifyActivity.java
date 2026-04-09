@@ -22,8 +22,10 @@ public class VerifyActivity extends AppCompatActivity {
 
     ListView listView;
     DBHelper dbHelper;
+    TextView tvTitle;
     ArrayList<VerifyItem> verifyItems;
     VerifyAdapter adapter;
+    ImageButton btnBack;
     int employerId;
 
     @Override
@@ -35,12 +37,19 @@ public class VerifyActivity extends AppCompatActivity {
         employerId = sharedPreferences.getInt("userId", -1);
 
         listView = findViewById(R.id.jobListView);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
         dbHelper = new DBHelper(this);
         verifyItems = new ArrayList<>();
-        
+
+        tvTitle = findViewById(R.id.tvTitle);
+        if (tvTitle != null) {
+            tvTitle.setText("Verify Work");
+        }
+
+        btnBack = findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
+
         loadBookings();
     }
 

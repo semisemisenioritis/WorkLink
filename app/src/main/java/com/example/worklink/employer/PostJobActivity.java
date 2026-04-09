@@ -19,6 +19,7 @@ public class PostJobActivity extends AppCompatActivity {
 
     EditText title, desc, location, wage, duration, skills, count, dateInput;
     Button post;
+    ImageButton btnBack;
     DBHelper dbHelper;
     int employerId;
     final Calendar calendar = Calendar.getInstance();
@@ -31,6 +32,7 @@ public class PostJobActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         employerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         title = findViewById(R.id.etTitle);
         desc = findViewById(R.id.etDesc);
         location = findViewById(R.id.etLocation);
@@ -40,10 +42,10 @@ public class PostJobActivity extends AppCompatActivity {
         count = findViewById(R.id.etCount);
         dateInput = findViewById(R.id.etDate);
         post = findViewById(R.id.btnPost);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         dbHelper = new DBHelper(this);
+
+        btnBack.setOnClickListener(v -> finish());
 
         // Date Picker logic
         DatePickerDialog.OnDateSetListener dateSetListener = (view, year, month, day) -> {

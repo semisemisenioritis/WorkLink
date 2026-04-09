@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
@@ -18,6 +19,7 @@ public class ResumeViewerActivity extends AppCompatActivity {
 
     TextView tvPreview;
     Button btnDownload;
+    ImageButton btnBack;
     DBHelper dbHelper;
     int workerId;
 
@@ -29,12 +31,14 @@ public class ResumeViewerActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getInt("userId", -1);
 
+        btnBack = findViewById(R.id.btnBack);
         tvPreview = findViewById(R.id.tvResumePreview);
         btnDownload = findViewById(R.id.btnDownloadPdf);
-        
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
         dbHelper = new DBHelper(this);
+
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
 
         loadResumePreview();
 
