@@ -2,9 +2,8 @@ package com.example.worklink.worker;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,31 +15,38 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 
-import com.example.worklink.DBHelper;
+import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
+import com.example.worklink.models.Payment;
+import com.example.worklink.models.Rating;
+import com.example.worklink.models.User;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 public class EarningsActivity extends AppCompatActivity {
 
-    DBHelper dbHelper;
     TextView earningsText, ratingText, tvSelectedRange;
     Button btnDateRange, btnClear;
     ImageButton btnBack;
     ListView reviewsList;
-    int workerId;
+    String workerId;
+    private FirebaseFirestore db;
 
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     SimpleDateFormat displaySdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
     
-    String startDateFilter = null;
-    String endDateFilter = null;
+    Date startDateFilter = null;
+    Date endDateFilter = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_earnings);
 
+        db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        workerId = sharedPreferences.getInt("userId", -1);
+        workerId = sharedPreferences.getString("userId", "");
 
         btnBack = findViewById(R.id.btnBack);
         earningsText = findViewById(R.id.tvEarnings);
@@ -50,8 +56,6 @@ public class EarningsActivity extends AppCompatActivity {
         btnDateRange = findViewById(R.id.btnDateRange);
         btnClear = findViewById(R.id.btnClearFilter);
         
-        dbHelper = new DBHelper(this);
-
         btnBack.setOnClickListener(v -> finish());
         btnDateRange.setOnClickListener(v -> showDateRangePicker());
         
@@ -70,25 +74,16 @@ public class EarningsActivity extends AppCompatActivity {
         MaterialDatePicker<Pair<Long, Long>> dateRangePicker =
                 MaterialDatePicker.Builder.dateRangePicker()
                         .setTitleText("Select Date Range")
-                        .setSelection(
-                            new Pair<>(
-                                MaterialDatePicker.thisMonthInUtcMilliseconds(),
-                                MaterialDatePicker.todayInUtcMilliseconds()
-                            )
-                        )
                         .build();
 
         dateRangePicker.show(getSupportFragmentManager(), "DATE_RANGE_PICKER");
 
         dateRangePicker.addOnPositiveButtonClickListener(selection -> {
-            Long startDate = selection.first;
-            Long endDate = selection.second;
-
-            if (startDate != null && endDate != null) {
-                startDateFilter = sdf.format(new Date(startDate));
-                endDateFilter = sdf.format(new Date(endDate));
+            if (selection.first != null && selection.second != null) {
+                startDateFilter = new Date(selection.first);
+                endDateFilter = new Date(selection.second);
                 
-                String displayRange = displaySdf.format(new Date(startDate)) + " - " + displaySdf.format(new Date(endDate));
+                String displayRange = displaySdf.format(startDateFilter) + " - " + displaySdf.format(endDateFilter);
                 tvSelectedRange.setText(displayRange);
                 btnClear.setVisibility(View.VISIBLE);
                 loadData();
@@ -97,78 +92,55 @@ public class EarningsActivity extends AppCompatActivity {
     }
 
     private void loadData() {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        // 1. Load Overall Rating from User profile
+        FirestoreManager.getInstance().getUser(workerId).addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                User user = doc.toObject(User.class);
+                if (user != null && user.getWorkerRating() != null) {
+                    ratingText.setText(String.format(Locale.getDefault(), "Rating: ⭐ %.1f", user.getWorkerRating()));
+                }
+            }
+        });
 
-        // 1. Load Total Earnings
-        String earningsQuery = "SELECT SUM(p.amount) FROM payments p " +
-                "JOIN bookings b ON p.booking_id = b.booking_id " +
-                "WHERE b.worker_id=? AND p.payment_status='PAID'";
-        
-        ArrayList<String> args = new ArrayList<>();
-        args.add(String.valueOf(workerId));
-
-        if (startDateFilter != null && endDateFilter != null) {
-            earningsQuery += " AND date(p.payment_date/1000, 'unixepoch') BETWEEN ? AND ?";
-            args.add(startDateFilter);
-            args.add(endDateFilter);
-        }
-
-        Cursor earningsCursor = db.rawQuery(earningsQuery, args.toArray(new String[0]));
-        if (earningsCursor.moveToFirst()) {
-            earningsText.setText(String.format(Locale.getDefault(), "Total: ₹%.2f", earningsCursor.getDouble(0)));
-        }
-        earningsCursor.close();
-
-        // 2. Load Overall Rating
-        Cursor profileCursor = db.rawQuery(
-                "SELECT rating FROM worker_profile WHERE worker_id=?",
-                new String[]{String.valueOf(workerId)}
-        );
-        if (profileCursor.moveToFirst()) {
-            ratingText.setText(String.format(Locale.getDefault(), "Rating: ⭐ %.1f", profileCursor.getDouble(0)));
-        }
-        profileCursor.close();
-
-        // 3. Load Individual Reviews
-        ArrayList<String> reviews = new ArrayList<>();
-        String reviewsQuery = "SELECT r.rating, r.review, p.amount, j.title, p.payment_date " +
-                "FROM ratings r " +
-                "JOIN bookings b ON r.booking_id = b.booking_id " +
-                "JOIN payments p ON b.booking_id = p.booking_id " +
-                "JOIN jobs j ON b.job_id = j.job_id " +
-                "WHERE b.worker_id=?";
-
-        ArrayList<String> rArgs = new ArrayList<>();
-        rArgs.add(String.valueOf(workerId));
+        // 2. Load Payments and calculate total
+        Query paymentQuery = db.collection("payments")
+                .whereEqualTo("workerId", workerId)
+                .whereEqualTo("paymentStatus", "PAID");
 
         if (startDateFilter != null && endDateFilter != null) {
-            reviewsQuery += " AND date(p.payment_date/1000, 'unixepoch') BETWEEN ? AND ?";
-            rArgs.add(startDateFilter);
-            rArgs.add(endDateFilter);
+            paymentQuery = paymentQuery.whereGreaterThanOrEqualTo("paymentDate", new Timestamp(startDateFilter))
+                                     .whereLessThanOrEqualTo("paymentDate", new Timestamp(endDateFilter));
         }
 
-        reviewsQuery += " ORDER BY p.payment_date DESC";
+        paymentQuery.get().addOnSuccessListener(queryDocumentSnapshots -> {
+            double total = 0;
+            for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                Payment payment = doc.toObject(Payment.class);
+                if (payment.getAmount() != null) {
+                    total += payment.getAmount();
+                }
+            }
+            earningsText.setText(String.format(Locale.getDefault(), "Total: ₹%.2f", total));
+        });
 
-        Cursor reviewCursor = db.rawQuery(reviewsQuery, rArgs.toArray(new String[0]));
+        // 3. Load Reviews (Ratings)
+        Query ratingQuery = db.collection("ratings")
+                .whereEqualTo("givenTo", workerId)
+                .orderBy("createdAt", Query.Direction.DESCENDING);
 
-        while (reviewCursor.moveToNext()) {
-            int stars = reviewCursor.getInt(0);
-            String comment = reviewCursor.getString(1);
-            double amount = reviewCursor.getDouble(2);
-            String jobTitle = reviewCursor.getString(3);
-            
-            String display = jobTitle + "\n" +
-                             "Earned: ₹" + String.format(Locale.getDefault(), "%.2f", amount) + " | Rating: " + stars + "⭐\n" +
-                             "\"" + (comment.isEmpty() ? "No comment" : comment) + "\"";
-            reviews.add(display);
-        }
-        reviewCursor.close();
-
-        if (reviews.isEmpty()) {
-            reviews.add("No earnings found for this period.");
-        }
-
-        reviewsList.setAdapter(new ArrayAdapter<>(this,
-                R.layout.list_item_white_text, reviews));
+        ratingQuery.get().addOnSuccessListener(queryDocumentSnapshots -> {
+            ArrayList<String> reviews = new ArrayList<>();
+            if (queryDocumentSnapshots.isEmpty()) {
+                reviews.add("No reviews found.");
+            } else {
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    Rating r = doc.toObject(Rating.class);
+                    String display = "Rating: " + r.getRating() + "⭐\n" +
+                                     "\"" + (TextUtils.isEmpty(r.getReview()) ? "No comment" : r.getReview()) + "\"";
+                    reviews.add(display);
+                }
+            }
+            reviewsList.setAdapter(new ArrayAdapter<>(this, R.layout.list_item_white_text, reviews));
+        });
     }
 }

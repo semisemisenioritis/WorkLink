@@ -123,6 +123,14 @@
             android:focusable="false"
             android:clickable="true"/>
 
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:layout_marginBottom="10dp"/>
+
         <Button
             android:id="@+id/btnPost"
             android:text="Post Job"

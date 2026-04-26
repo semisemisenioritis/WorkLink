@@ -9,6 +9,7 @@ import android.widget.ImageButton;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.worklink.LoginActivity;
 import com.example.worklink.R;
+import com.google.firebase.auth.FirebaseAuth;
 
 public class EmployerDashBoard extends AppCompatActivity {
 
@@ -27,13 +28,7 @@ public class EmployerDashBoard extends AppCompatActivity {
         logout = findViewById(R.id.btnLogout);
 
         if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                // Return to Login
-                Intent intent = new Intent(EmployerDashBoard.this, LoginActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
-            });
+            btnBack.setOnClickListener(v -> finish());
         }
 
         searchWorkers.setOnClickListener(v ->
@@ -46,7 +41,10 @@ public class EmployerDashBoard extends AppCompatActivity {
                 startActivity(new Intent(this, VerifyActivity.class)));
 
         logout.setOnClickListener(v -> {
-            // Clear session
+            // Firebase Sign Out
+            FirebaseAuth.getInstance().signOut();
+            
+            // Clear local session
             SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = sharedPreferences.edit();
             editor.clear();

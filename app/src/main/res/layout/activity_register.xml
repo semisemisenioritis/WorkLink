@@ -21,7 +21,7 @@
         android:id="@+id/tvTitle"
         android:text="Register"
         android:textSize="40sp"
-        android:layout_marginBottom="70dp"
+        android:layout_marginBottom="40dp"
         android:textStyle="bold"
         android:textColor="#E6F1FF"
         android:gravity="center"
@@ -29,66 +29,94 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
-    <EditText
-        android:id="@+id/etName"
-        android:hint="Name"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp"
+    <!-- Step 1: User Info -->
+    <LinearLayout
+        android:id="@+id/layoutUserInfo"
+        android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content">
 
-    <EditText
-        android:id="@+id/etPhone"
-        android:hint="Phone"
-        android:inputType="phone"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp"
+        <EditText
+            android:id="@+id/etName"
+            android:hint="Full Name"
+            android:background="#112240"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#8892B0"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/etPhone"
+            android:hint="Phone (e.g., +1234567890)"
+            android:inputType="phone"
+            android:background="#112240"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#8892B0"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <Spinner
+            android:id="@+id/spRole"
+            android:background="#112240"
+            android:layout_marginBottom="25dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <Button
+            android:id="@+id/btnSendOTP"
+            android:text="Send Verification Code"
+            android:backgroundTint="#1E88E5"
+            android:textColor="#FFFFFF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- Step 2: OTP Verification (Hidden by default) -->
+    <LinearLayout
+        android:id="@+id/layoutOTP"
+        android:orientation="vertical"
+        android:visibility="gone"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content">
 
-    <EditText
-        android:id="@+id/etUsername"
-        android:hint="Username"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <TextView
+            android:text="Enter the 6-digit code sent to your phone"
+            android:textColor="#8892B0"
+            android:layout_marginBottom="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
 
-    <EditText
-        android:id="@+id/etPassword"
-        android:hint="Password"
-        android:inputType="textPassword"
-        android:background="#112240"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8892B0"
-        android:padding="12dp"
-        android:layout_marginBottom="16dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <EditText
+            android:id="@+id/etOTP"
+            android:hint="Verification Code"
+            android:inputType="number"
+            android:maxLength="6"
+            android:background="#112240"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#8892B0"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
 
-    <Spinner
-        android:id="@+id/spRole"
-        android:background="#112240"
-        android:layout_marginBottom="25dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <Button
+            android:id="@+id/btnVerifyOTP"
+            android:text="Verify and Register"
+            android:backgroundTint="#1E88E5"
+            android:textColor="#FFFFFF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnSubmit"
-        android:text="Register"
-        android:backgroundTint="#1E88E5"
-        android:textColor="#FFFFFF"
-        android:layout_gravity="end"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:visibility="gone"
+            android:layout_gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
 
 </LinearLayout>

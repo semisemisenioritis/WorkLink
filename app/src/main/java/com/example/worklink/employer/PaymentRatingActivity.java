@@ -1,102 +1,129 @@
 package com.example.worklink.employer;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Log;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.worklink.DBHelper;
 import com.example.worklink.R;
+import com.example.worklink.models.Payment;
+import com.example.worklink.models.Rating;
+import com.example.worklink.models.User;
+import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class PaymentRatingActivity extends AppCompatActivity {
 
-    EditText amount, review;
+    EditText etAmount, etReview;
     RatingBar ratingBar;
-    Button submit;
-    DBHelper dbHelper;
-    int bookingId;
-    int employerId;
-    int workerId;
+    Button btnSubmit;
+    String bookingId, employerId, workerId;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.employer_activity_payment_rating);
 
+        db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        employerId = sharedPreferences.getInt("userId", -1);
+        employerId = sharedPreferences.getString("userId", "");
+
+        if (TextUtils.isEmpty(employerId) && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            employerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         // Get data from Intent
-        bookingId = getIntent().getIntExtra("bookingId", -1);
-        workerId = getIntent().getIntExtra("workerId", -1);
+        bookingId = getIntent().getStringExtra("bookingId");
+        workerId = getIntent().getStringExtra("workerId");
         double suggestedAmount = getIntent().getDoubleExtra("amount", 0.0);
 
-        amount = findViewById(R.id.etAmount);
-        review = findViewById(R.id.etReview);
+        etAmount = findViewById(R.id.etAmount);
+        etReview = findViewById(R.id.etReview);
         ratingBar = findViewById(R.id.ratingBar);
-        submit = findViewById(R.id.btnSubmit);
+        btnSubmit = findViewById(R.id.btnSubmit);
         
-        amount.setText(String.valueOf(suggestedAmount));
-        
-        dbHelper = new DBHelper(this);
+        etAmount.setText(String.valueOf(suggestedAmount));
 
-        submit.setOnClickListener(v -> {
-            String amountStr = amount.getText().toString();
+        btnSubmit.setOnClickListener(v -> {
+            String amountStr = etAmount.getText().toString();
             if (amountStr.isEmpty()) {
                 Toast.makeText(this, "Please enter amount", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            btnSubmit.setEnabled(false);
+            double paidAmount = Double.parseDouble(amountStr);
+            int givenRating = (int) ratingBar.getRating();
+            String reviewText = etReview.getText().toString();
 
             // 1. Record Payment
-            ContentValues pay = new ContentValues();
-            pay.put("booking_id", bookingId);
-            pay.put("amount", Double.parseDouble(amountStr));
-            pay.put("payment_status", "PAID");
-            pay.put("payment_date", System.currentTimeMillis()); // Using current time
+            Payment payment = new Payment();
+            payment.setBookingId(bookingId);
+            payment.setWorkerId(workerId);
+            payment.setEmployerId(employerId);
+            payment.setAmount(paidAmount);
+            payment.setPaymentStatus("PAID");
+            payment.setPaymentDate(Timestamp.now());
 
-            db.insert("payments", null, pay);
+            db.collection("payments").add(payment).addOnSuccessListener(ref -> {
+                // 2. Record Rating
+                Rating rating = new Rating();
+                rating.setBookingId(bookingId);
+                rating.setGivenBy(employerId);
+                rating.setGivenTo(workerId);
+                rating.setRating(givenRating);
+                rating.setReview(reviewText);
+                rating.setCreatedAt(Timestamp.now());
 
-            // 2. Record Rating
-            int givenRating = (int) ratingBar.getRating();
-            ContentValues rate = new ContentValues();
-            rate.put("booking_id", bookingId);
-            rate.put("given_by", employerId);
-            rate.put("given_to", workerId);
-            rate.put("rating", givenRating);
-            rate.put("review", review.getText().toString());
-
-            db.insert("ratings", null, rate);
-
-            // 3. Update Worker Profile (Average Rating and Total Jobs)
-            updateWorkerStats(db, workerId);
-
-            Toast.makeText(this, "Payment & Rating Submitted", Toast.LENGTH_SHORT).show();
-            finish();
+                db.collection("ratings").add(rating).addOnSuccessListener(rateRef -> {
+                    // 3. Update Worker Profile Stats
+                    updateWorkerStats(workerId);
+                }).addOnFailureListener(e -> {
+                    Toast.makeText(this, "Rating failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    btnSubmit.setEnabled(true);
+                });
+            }).addOnFailureListener(e -> {
+                Toast.makeText(this, "Payment failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                btnSubmit.setEnabled(true);
+            });
         });
     }
 
-    private void updateWorkerStats(SQLiteDatabase db, int workerId) {
-        // Calculate new average rating
-        Cursor cursor = db.rawQuery("SELECT AVG(rating), COUNT(rating) FROM ratings WHERE given_to=?",
-                new String[]{String.valueOf(workerId)});
-        
-        if (cursor.moveToFirst()) {
-            double avgRating = cursor.getDouble(0);
-            int totalJobs = cursor.getInt(1);
+    private void updateWorkerStats(String workerId) {
+        // We attempt to fetch ratings. If it fails due to index, we still finish the activity
+        // so the user isn't stuck. The payment was already saved successfully.
+        db.collection("ratings").whereEqualTo("givenTo", workerId).get()
+            .addOnSuccessListener(snaps -> {
+                int count = snaps.size();
+                double sum = 0;
+                for (com.google.firebase.firestore.DocumentSnapshot doc : snaps) {
+                    Long r = doc.getLong("rating");
+                    if (r != null) sum += r;
+                }
+                double avg = count > 0 ? sum / count : 0;
 
-            ContentValues values = new ContentValues();
-            values.put("rating", avgRating);
-            values.put("total_jobs", totalJobs);
+                Map<String, Object> updates = new HashMap<>();
+                updates.put("workerRating", avg);
+                updates.put("totalJobs", count);
 
-            db.update("worker_profile", values, "worker_id=?",
-                    new String[]{String.valueOf(workerId)});
-        }
-        cursor.close();
+                db.collection("users").document(workerId).update(updates).addOnCompleteListener(task -> {
+                    Toast.makeText(this, "Submitted successfully!", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            })
+            .addOnFailureListener(e -> {
+                Log.e("Firestore", "Stats update failed (likely index): " + e.getMessage());
+                // Even if stats update fails, the payment is done.
+                Toast.makeText(this, "Payment recorded. Stats will update once index is ready.", Toast.LENGTH_LONG).show();
+                finish();
+            });
     }
 }

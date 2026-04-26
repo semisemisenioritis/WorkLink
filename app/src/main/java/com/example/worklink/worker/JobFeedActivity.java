@@ -2,105 +2,133 @@ package com.example.worklink.worker;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.worklink.DBHelper;
+import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
+import com.example.worklink.models.Application;
+import com.example.worklink.models.Job;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 public class JobFeedActivity extends AppCompatActivity {
 
     ListView listView;
     ImageButton btnBack;
-    DBHelper dbHelper;
-    ArrayList<String> jobsList;
-    ArrayList<Integer> jobIds;
+    ArrayList<String> jobsDisplayList;
+    ArrayList<Job> fullJobsList;
     ArrayAdapter<String> adapter;
-    int workerId;
+    String workerId;
+    private ListenerRegistration jobListener;
+    private ListenerRegistration appListener;
+    private Set<String> appliedJobIds = new HashSet<>();
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_job_feed);
 
+        db = FirebaseFirestore.getInstance();
+        
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        workerId = sharedPreferences.getInt("userId", -1);
+        workerId = sharedPreferences.getString("userId", "");
+        if (workerId.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            workerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         btnBack = findViewById(R.id.btnBack);
         listView = findViewById(R.id.jobListView);
-        dbHelper = new DBHelper(this);
-        jobsList = new ArrayList<>();
-        jobIds = new ArrayList<>();
+        
+        jobsDisplayList = new ArrayList<>();
+        fullJobsList = new ArrayList<>();
+        
+        adapter = new ArrayAdapter<>(this, R.layout.list_item_white_text, jobsDisplayList);
+        listView.setAdapter(adapter);
 
         btnBack.setOnClickListener(v -> finish());
 
-        loadJobs();
-
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            int jobId = jobIds.get(position);
-            String jobTitle = jobsList.get(position).split(" - ")[0];
-
-            new AlertDialog.Builder(this)
-                    .setTitle("Apply for Job")
-                    .setMessage("Do you want to send an application for \"" + jobTitle + "\"?")
-                    .setPositiveButton("Yes", (dialog, which) -> applyForJob(jobId))
-                    .setNegativeButton("No", null)
-                    .show();
-        });
+        // First listen to apps, then jobs
+        startRealtimeAppListener();
     }
 
-    private void loadJobs() {
-        jobsList.clear();
-        jobIds.clear();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        // Filter out jobs that the user has already applied for
-        String query = "SELECT * FROM jobs WHERE status='OPEN' AND job_id NOT IN " +
-                       "(SELECT job_id FROM applications WHERE worker_id = ?)";
-        
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(workerId)});
-
-        while (cursor.moveToNext()) {
-            jobIds.add(cursor.getInt(0));
-            String job = cursor.getString(2) + " - ₹" + cursor.getDouble(5);
-            jobsList.add(job);
-        }
-        cursor.close();
-
-        adapter = new ArrayAdapter<>(this,
-                R.layout.list_item_white_text, jobsList);
-        listView.setAdapter(adapter);
+    private void startRealtimeAppListener() {
+        appListener = db.collection("applications")
+                .whereEqualTo("workerId", workerId)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) return;
+                    if (value != null) {
+                        appliedJobIds.clear();
+                        for (QueryDocumentSnapshot doc : value) {
+                            String jId = doc.getString("jobId");
+                            if (jId != null) appliedJobIds.add(jId);
+                        }
+                        if (jobListener == null) startRealtimeJobListener();
+                        else filterAndRefreshUI();
+                    }
+                });
     }
 
-    private void applyForJob(int jobId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+    private com.google.firebase.firestore.QuerySnapshot lastJobSnapshot;
 
-        // Check if already applied (redundant now due to filtering, but good for safety)
-        Cursor check = db.rawQuery("SELECT * FROM applications WHERE job_id=? AND worker_id=?",
-                new String[]{String.valueOf(jobId), String.valueOf(workerId)});
-        
-        if (check.getCount() > 0) {
-            Toast.makeText(this, "You have already applied for this job", Toast.LENGTH_SHORT).show();
-            check.close();
-            return;
-        }
-        check.close();
+    private void startRealtimeJobListener() {
+        jobListener = FirestoreManager.getInstance().getAvailableJobsQuery()
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (value != null) {
+                        lastJobSnapshot = value;
+                        filterAndRefreshUI();
+                    }
+                });
+    }
 
-        try {
-            db.execSQL("INSERT INTO applications (job_id, worker_id, status) VALUES (?, ?, 'pending')",
-                    new Object[]{jobId, workerId});
-            Toast.makeText(this, "Application Sent Successfully!", Toast.LENGTH_SHORT).show();
-            
-            // Refresh the feed to remove the applied job
-            loadJobs();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error sending application", Toast.LENGTH_SHORT).show();
+    private void filterAndRefreshUI() {
+        if (lastJobSnapshot == null) return;
+        jobsDisplayList.clear();
+        fullJobsList.clear();
+        for (QueryDocumentSnapshot doc : lastJobSnapshot) {
+            Job job = doc.toObject(Job.class);
+            if (!appliedJobIds.contains(job.getJobId())) {
+                fullJobsList.add(job);
+                jobsDisplayList.add(job.getTitle() + " - ₹" + job.getWage() + "\n" + job.getLocation());
+            }
         }
+        adapter.notifyDataSetChanged();
+    }
+
+    private void showApplyDialog(Job job) {
+        new AlertDialog.Builder(this)
+                .setTitle("Apply for Job")
+                .setMessage("Do you want to send an application for \"" + job.getTitle() + "\"?")
+                .setPositiveButton("Yes", (dialog, which) -> applyForJob(job))
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    private void applyForJob(Job job) {
+        Application newApp = new Application(job.getJobId(), workerId);
+        FirestoreManager.getInstance().applyForJob(newApp)
+                .addOnSuccessListener(aVoid -> Toast.makeText(this, "Applied Successfully!", Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (jobListener != null) jobListener.remove();
+        if (appListener != null) appListener.remove();
     }
 }

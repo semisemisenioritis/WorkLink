@@ -2,8 +2,6 @@ package com.example.worklink.worker;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,76 +10,98 @@ import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.worklink.DBHelper;
+import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
+import com.example.worklink.models.Application;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
 
 public class ApplicationsActivity extends AppCompatActivity {
 
     ListView listView;
-    DBHelper dbHelper;
     ArrayList<ApplicationItem> applicationItems;
     ApplicationAdapter adapter;
     ImageButton btnBack;
-    int workerId;
+    String workerId;
+    private ListenerRegistration appListener;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_applications);
 
+        db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        workerId = sharedPreferences.getInt("userId", -1);
+        workerId = sharedPreferences.getString("userId", "");
+
+        if (workerId.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            workerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         listView = findViewById(R.id.lvApplications);
         btnBack = findViewById(R.id.btnBack);
-        dbHelper = new DBHelper(this);
         applicationItems = new ArrayList<>();
+        
+        adapter = new ApplicationAdapter(this, applicationItems);
+        listView.setAdapter(adapter);
 
         btnBack.setOnClickListener(v -> finish());
 
-        loadApplications();
+        startRealtimeApplicationsListener();
     }
 
-    private void loadApplications() {
-        applicationItems.clear();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+    private void startRealtimeApplicationsListener() {
+        appListener = FirestoreManager.getInstance().getApplicationsForWorker(workerId)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) return;
 
-        String query = "SELECT j.title, a.status, a.applied_at, a.application_id FROM applications a " +
-                "JOIN jobs j ON a.job_id = j.job_id " +
-                "WHERE a.worker_id = ? " +
-                "ORDER BY a.applied_at DESC";
+                    if (value != null) {
+                        applicationItems.clear();
+                        for (QueryDocumentSnapshot doc : value) {
+                            Application app = doc.toObject(Application.class);
+                            fetchJobDetailsAndAdd(app);
+                        }
+                    }
+                });
+    }
 
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(workerId)});
-
-        while (cursor.moveToNext()) {
+    private void fetchJobDetailsAndAdd(Application app) {
+        // Fetch the Job title because it's not stored in the application document
+        db.collection("jobs").document(app.getJobId()).get().addOnSuccessListener(doc -> {
+            String title = doc.exists() ? doc.getString("title") : "Unknown Job";
+            String date = app.getAppliedAt() != null ? app.getAppliedAt().toDate().toString() : "";
+            
             applicationItems.add(new ApplicationItem(
-                cursor.getInt(3),
-                cursor.getString(0),
-                cursor.getString(1),
-                cursor.getString(2)
+                    app.getApplicationId(),
+                    title,
+                    app.getStatus(),
+                    date
             ));
-        }
-        cursor.close();
-
-        adapter = new ApplicationAdapter(this, applicationItems);
-        listView.setAdapter(adapter);
+            adapter.notifyDataSetChanged();
+        });
     }
 
-    private void withdrawApplication(int appId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        db.execSQL("UPDATE applications SET status='withdrawn' WHERE application_id=?", new Object[]{appId});
-        Toast.makeText(this, "Application Withdrawn", Toast.LENGTH_SHORT).show();
-        loadApplications();
+    private void withdrawApplication(String appId) {
+        db.collection("applications").document(appId).update("status", "withdrawn")
+                .addOnSuccessListener(aVoid -> Toast.makeText(this, "Application Withdrawn", Toast.LENGTH_SHORT).show());
     }
 
-    // Data class for applications
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (appListener != null) appListener.remove();
+    }
+
     static class ApplicationItem {
-        int id;
+        String id;
         String title, status, date;
 
-        ApplicationItem(int id, String title, String status, String date) {
+        ApplicationItem(String id, String title, String status, String date) {
             this.id = id;
             this.title = title;
             this.status = status;
@@ -89,7 +109,6 @@ public class ApplicationsActivity extends AppCompatActivity {
         }
     }
 
-    // Custom Adapter to handle the Withdraw button
     private class ApplicationAdapter extends ArrayAdapter<ApplicationItem> {
         ApplicationAdapter(Context context, ArrayList<ApplicationItem> items) {
             super(context, 0, items);
@@ -106,23 +125,20 @@ public class ApplicationsActivity extends AppCompatActivity {
             Button btnWithdraw = convertView.findViewById(R.id.btnWithdraw);
 
             String displayStatus = item.status.substring(0, 1).toUpperCase() + item.status.substring(1);
-            info.setText("Job: " + item.title + "\nStatus: " + displayStatus + "\nApplied on: " + item.date);
+            info.setText("Job: " + item.title + "\nStatus: " + displayStatus + "\nDate: " + item.date);
 
-            // Show withdraw button only for pending applications
-            if (item.status.equals("pending")) {
+            if ("pending".equals(item.status)) {
                 btnWithdraw.setVisibility(View.VISIBLE);
                 btnWithdraw.setOnClickListener(v -> {
                     new AlertDialog.Builder(getContext())
-                            .setTitle("Withdraw Application")
-                            .setMessage("Are you sure you want to withdraw this application?")
+                            .setTitle("Withdraw")
+                            .setMessage("Are you sure?")
                             .setPositiveButton("Yes", (dialog, which) -> withdrawApplication(item.id))
-                            .setNegativeButton("No", null)
-                            .show();
+                            .setNegativeButton("No", null).show();
                 });
             } else {
                 btnWithdraw.setVisibility(View.GONE);
             }
-
             return convertView;
         }
     }

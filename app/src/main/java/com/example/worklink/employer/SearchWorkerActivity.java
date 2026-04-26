@@ -1,24 +1,32 @@
 package com.example.worklink.employer;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import com.example.worklink.FirestoreManager;
+import com.example.worklink.R;
+import com.example.worklink.models.Application;
+import com.example.worklink.models.Job;
+import com.example.worklink.models.User;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
-
-import com.example.worklink.DBHelper;
-import com.example.worklink.R;
 
 public class SearchWorkerActivity extends AppCompatActivity {
 
@@ -29,24 +37,27 @@ public class SearchWorkerActivity extends AppCompatActivity {
     CheckBox cbSortRating;
     ChipGroup chipGroupSkills;
     ListView listView;
-    DBHelper dbHelper;
     
     ArrayList<WorkerRecord> currentWorkerRecords = new ArrayList<>();
+    ArrayList<Job> employerJobs = new ArrayList<>();
+    ArrayList<String> jobTitles = new ArrayList<>();
     
-    ArrayList<String> jobTitles;
-    ArrayList<Integer> jobIds;
-    ArrayList<String> jobSkills;
-    
-    int employerId;
+    String employerId;
     Set<String> selectedFilterSkills = new HashSet<>();
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.employer_activity_search_worker);
 
+        db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        employerId = sharedPreferences.getInt("userId", -1);
+        employerId = sharedPreferences.getString("userId", "");
+
+        if (TextUtils.isEmpty(employerId) && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            employerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         btnBack = findViewById(R.id.btnBack);
         spJobs = findViewById(R.id.spJobs);
@@ -57,7 +68,6 @@ public class SearchWorkerActivity extends AppCompatActivity {
         cbSortRating = findViewById(R.id.cbSortRating);
         chipGroupSkills = findViewById(R.id.chipGroupSkills);
         listView = findViewById(R.id.listWorkers);
-        dbHelper = new DBHelper(this);
 
         btnBack.setOnClickListener(v -> finish());
 
@@ -66,16 +76,14 @@ public class SearchWorkerActivity extends AppCompatActivity {
         spJobs.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!jobIds.isEmpty() && !jobTitles.get(position).equals("No Open Jobs Found")) {
-                    int selectedJobId = jobIds.get(position);
-                    String skills = jobSkills.get(position);
-                    
+                if (!employerJobs.isEmpty()) {
+                    Job selectedJob = employerJobs.get(position);
                     layoutJobActions.setVisibility(View.VISIBLE);
                     layoutFilters.setVisibility(View.VISIBLE);
                     
-                    setupSkillChips(skills);
-                    updateActionButtons(selectedJobId);
-                    loadApplicants(selectedJobId);
+                    setupSkillChips(selectedJob.getRequiredSkills());
+                    updateActionButtons(selectedJob.getJobId());
+                    loadApplicants(selectedJob.getJobId());
                 } else {
                     layoutJobActions.setVisibility(View.GONE);
                     layoutFilters.setVisibility(View.GONE);
@@ -83,7 +91,6 @@ public class SearchWorkerActivity extends AppCompatActivity {
                     applyFiltersAndSort();
                 }
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -91,16 +98,16 @@ public class SearchWorkerActivity extends AppCompatActivity {
         cbSortRating.setOnCheckedChangeListener((buttonView, isChecked) -> applyFiltersAndSort());
 
         btnWithdrawJob.setOnClickListener(v -> {
-            int position = spJobs.getSelectedItemPosition();
-            if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
-                withdrawJob(jobIds.get(position));
+            int pos = spJobs.getSelectedItemPosition();
+            if (pos != AdapterView.INVALID_POSITION && !employerJobs.isEmpty()) {
+                withdrawJob(employerJobs.get(pos).getJobId());
             }
         });
 
         btnConfirmBooking.setOnClickListener(v -> {
-            int position = spJobs.getSelectedItemPosition();
-            if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
-                confirmBooking(jobIds.get(position));
+            int pos = spJobs.getSelectedItemPosition();
+            if (pos != AdapterView.INVALID_POSITION && !employerJobs.isEmpty()) {
+                confirmBooking(employerJobs.get(pos).getJobId());
             }
         });
 
@@ -119,7 +126,7 @@ public class SearchWorkerActivity extends AppCompatActivity {
     private void setupSkillChips(String skills) {
         chipGroupSkills.removeAllViews();
         selectedFilterSkills.clear();
-        if (skills == null || skills.isEmpty()) return;
+        if (TextUtils.isEmpty(skills)) return;
 
         String[] skillArray = skills.split(",");
         for (String skill : skillArray) {
@@ -142,65 +149,62 @@ public class SearchWorkerActivity extends AppCompatActivity {
     }
 
     private void loadEmployerJobs() {
-        jobTitles = new ArrayList<>();
-        jobIds = new ArrayList<>();
-        jobSkills = new ArrayList<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        db.collection("jobs")
+            .whereEqualTo("employerId", employerId)
+            .whereEqualTo("status", "OPEN")
+            .get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                employerJobs.clear();
+                jobTitles.clear();
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    Job job = doc.toObject(Job.class);
+                    employerJobs.add(job);
+                    jobTitles.add(job.getTitle());
+                }
 
-        Cursor cursor = db.rawQuery("SELECT job_id, title, workers_needed, required_skills FROM jobs WHERE employer_id=? AND status='OPEN'", 
-                new String[]{String.valueOf(employerId)});
+                if (jobTitles.isEmpty()) {
+                    jobTitles.add("No Open Jobs Found");
+                    layoutJobActions.setVisibility(View.GONE);
+                    layoutFilters.setVisibility(View.GONE);
+                }
 
-        while (cursor.moveToNext()) {
-            int jId = cursor.getInt(0);
-            String title = cursor.getString(1);
-            int needed = cursor.getInt(2);
-            String skills = cursor.getString(3);
-            
-            Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jId)});
-            int filled = 0;
-            if (countCursor.moveToFirst()) filled = countCursor.getInt(0);
-            countCursor.close();
-
-            jobIds.add(jId);
-            jobTitles.add(title + " (" + filled + "/" + needed + ")");
-            jobSkills.add(skills);
-        }
-        cursor.close();
-
-        if (jobTitles.isEmpty()) {
-            jobTitles.add("No Open Jobs Found");
-            layoutJobActions.setVisibility(View.GONE);
-            layoutFilters.setVisibility(View.GONE);
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.spinner_item_white_text, jobTitles);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spJobs.setAdapter(adapter);
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.spinner_item_white_text, jobTitles);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spJobs.setAdapter(adapter);
+            });
     }
 
-    private void loadApplicants(int jobId) {
+    private void loadApplicants(String jobId) {
         currentWorkerRecords.clear();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        db.collection("applications")
+            .whereEqualTo("jobId", jobId)
+            .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    Application app = doc.toObject(Application.class);
+                    fetchWorkerDetails(app);
+                }
+            });
+    }
 
-        String query = "SELECT a.application_id, u.id, u.name, w.skills, w.rating FROM applications a " +
-                "JOIN users u ON a.worker_id = u.id " +
-                "JOIN worker_profile w ON u.id = w.worker_id " +
-                "WHERE a.job_id = ? AND a.status = 'pending' AND w.availability = 1";
-
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(jobId)});
-        while (cursor.moveToNext()) {
-            currentWorkerRecords.add(new WorkerRecord(
-                cursor.getInt(0), cursor.getInt(1), cursor.getString(2), 
-                cursor.getString(3), cursor.getDouble(4)
-            ));
-        }
-        cursor.close();
-        applyFiltersAndSort();
+    private void fetchWorkerDetails(Application app) {
+        db.collection("users").document(app.getWorkerId()).get().addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                User user = doc.toObject(User.class);
+                if (user != null && user.getAvailability() != null && user.getAvailability() == 1) {
+                    currentWorkerRecords.add(new WorkerRecord(
+                        app.getApplicationId(), user.getId(), user.getName(), 
+                        user.getSkills(), user.getWorkerRating() != null ? user.getWorkerRating() : 0.0
+                    ));
+                    applyFiltersAndSort();
+                }
+            }
+        });
     }
 
     private void applyFiltersAndSort() {
         ArrayList<WorkerRecord> filteredList = new ArrayList<>();
-        
         for (WorkerRecord w : currentWorkerRecords) {
             boolean match = true;
             String workerSkills = (w.skills != null ? w.skills.toLowerCase() : "");
@@ -230,91 +234,86 @@ public class SearchWorkerActivity extends AppCompatActivity {
         listView.setAdapter(adapter);
     }
 
-    private void updateActionButtons(int jobId) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jobId)});
-        int acceptedCount = 0;
-        if (cursor.moveToFirst()) acceptedCount = cursor.getInt(0);
-        cursor.close();
-
-        btnConfirmBooking.setEnabled(acceptedCount > 0);
-        btnConfirmBooking.setAlpha(acceptedCount > 0 ? 1.0f : 0.5f);
+    private void updateActionButtons(String jobId) {
+        db.collection("bookings").whereEqualTo("jobId", jobId).get().addOnSuccessListener(snaps -> {
+            int acceptedCount = snaps.size();
+            btnConfirmBooking.setEnabled(acceptedCount > 0);
+            btnConfirmBooking.setAlpha(acceptedCount > 0 ? 1.0f : 0.5f);
+        });
     }
 
-    private void acceptApplication(int appId, int workerId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        Cursor cursor = db.rawQuery("SELECT job_id FROM applications WHERE application_id=?", new String[]{String.valueOf(appId)});
-        if (cursor.moveToFirst()) {
-            int jobId = cursor.getInt(0);
-            ContentValues bookingValues = new ContentValues();
-            bookingValues.put("job_id", jobId);
-            bookingValues.put("worker_id", workerId);
-            bookingValues.put("status", "ACCEPTED");
-            db.insert("bookings", null, bookingValues);
-            db.execSQL("UPDATE applications SET status='accepted' WHERE application_id=?", new Object[]{appId});
-            
-            // Check capacity
-            Cursor jobCursor = db.rawQuery("SELECT workers_needed FROM jobs WHERE job_id=?", new String[]{String.valueOf(jobId)});
-            if (jobCursor.moveToFirst()) {
-                int needed = jobCursor.getInt(0);
-                Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jobId)});
-                int filled = 0;
-                if (countCursor.moveToFirst()) filled = countCursor.getInt(0);
-                countCursor.close();
-                if (filled >= needed) db.execSQL("UPDATE jobs SET status='FILLED' WHERE job_id=?", new Object[]{jobId});
+    private void acceptApplication(String appId, String workerId) {
+        db.collection("applications").document(appId).get().addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                String jobId = doc.getString("jobId");
+                Map<String, Object> booking = new HashMap<>();
+                booking.put("jobId", jobId);
+                booking.put("workerId", workerId);
+                booking.put("status", "ACCEPTED");
+                
+                db.collection("bookings").add(booking).addOnSuccessListener(ref -> {
+                    db.collection("applications").document(appId).update("status", "accepted");
+                    checkCapacityAndReload(jobId);
+                });
             }
-            jobCursor.close();
-            loadEmployerJobs(); 
-        }
-        cursor.close();
+        });
     }
 
-    private void rejectApplication(int appId) {
-        dbHelper.getWritableDatabase().execSQL("UPDATE applications SET status='rejected' WHERE application_id=?", new Object[]{appId});
-        int position = spJobs.getSelectedItemPosition();
-        if (position != AdapterView.INVALID_POSITION && !jobIds.isEmpty()) {
-            loadApplicants(jobIds.get(position));
-        }
+    private void checkCapacityAndReload(String jobId) {
+        db.collection("jobs").document(jobId).get().addOnSuccessListener(doc -> {
+            Job job = doc.toObject(Job.class);
+            db.collection("bookings").whereEqualTo("jobId", jobId).get().addOnSuccessListener(snaps -> {
+                if (job != null && snaps.size() >= job.getWorkersNeeded()) {
+                    db.collection("jobs").document(jobId).update("status", "FILLED");
+                }
+                loadEmployerJobs();
+            });
+        });
     }
 
-    private void withdrawJob(int jobId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        db.beginTransaction();
-        try {
-            db.execSQL("UPDATE jobs SET status='CANCELLED' WHERE job_id=?", new Object[]{jobId});
-            db.execSQL("UPDATE applications SET status='cancelled' WHERE job_id=? AND (status='accepted' OR status='pending')", new Object[]{jobId});
-            db.execSQL("DELETE FROM bookings WHERE job_id=?", new Object[]{jobId});
-            db.setTransactionSuccessful();
-        } finally { db.endTransaction(); }
-        loadEmployerJobs(); 
+    private void rejectApplication(String appId) {
+        db.collection("applications").document(appId).update("status", "rejected")
+            .addOnSuccessListener(aVoid -> {
+                int pos = spJobs.getSelectedItemPosition();
+                if (pos != AdapterView.INVALID_POSITION && !employerJobs.isEmpty()) {
+                    loadApplicants(employerJobs.get(pos).getJobId());
+                }
+            });
     }
 
-    private void confirmBooking(int jobId) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM bookings WHERE job_id=?", new String[]{String.valueOf(jobId)});
-        int acceptedCount = 0;
-        if (cursor.moveToFirst()) acceptedCount = cursor.getInt(0);
-        cursor.close();
+    private void withdrawJob(String jobId) {
+        db.collection("jobs").document(jobId).update("status", "CANCELLED");
+        db.collection("applications").whereEqualTo("jobId", jobId).get().addOnSuccessListener(snaps -> {
+            for (DocumentSnapshot doc : snaps) {
+                doc.getReference().update("status", "cancelled");
+            }
+        });
+        loadEmployerJobs();
+    }
 
-        if (acceptedCount == 0) return;
-
-        new AlertDialog.Builder(this)
+    private void confirmBooking(String jobId) {
+        db.collection("bookings").whereEqualTo("jobId", jobId).get().addOnSuccessListener(snaps -> {
+            if (snaps.isEmpty()) return;
+            new AlertDialog.Builder(this)
                 .setTitle("Confirm Booking")
-                .setMessage("Continue with " + acceptedCount + " workers?")
+                .setMessage("Continue with " + snaps.size() + " workers?")
                 .setPositiveButton("Yes", (dialog, which) -> {
-                    SQLiteDatabase wdb = dbHelper.getWritableDatabase();
-                    wdb.execSQL("UPDATE jobs SET status='FILLED' WHERE job_id=?", new Object[]{jobId});
-                    wdb.execSQL("UPDATE applications SET status='rejected' WHERE job_id=? AND status='pending'", new Object[]{jobId});
-                    loadEmployerJobs();
+                    db.collection("jobs").document(jobId).update("status", "FILLED");
+                    db.collection("applications").whereEqualTo("jobId", jobId)
+                        .whereEqualTo("status", "pending").get().addOnSuccessListener(pending -> {
+                            for (DocumentSnapshot doc : pending) doc.getReference().update("status", "rejected");
+                            loadEmployerJobs();
+                        });
                 })
                 .setNegativeButton("No", null).show();
+        });
     }
 
     static class WorkerRecord {
-        int appId, id;
+        String appId, id;
         String name, skills;
         double rating;
-        WorkerRecord(int appId, int id, String name, String skills, double rating) {
+        WorkerRecord(String appId, String id, String name, String skills, double rating) {
             this.appId = appId; this.id = id; this.name = name; this.skills = skills; this.rating = rating;
         }
     }

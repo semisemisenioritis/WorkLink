@@ -1,16 +1,17 @@
 package com.example.worklink.employer;
 
 import android.app.DatePickerDialog;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.worklink.DBHelper;
+import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
+import com.example.worklink.models.Job;
+import com.google.firebase.auth.FirebaseAuth;
 
 import java.util.Calendar;
 import java.util.Locale;
@@ -20,8 +21,8 @@ public class PostJobActivity extends AppCompatActivity {
     EditText title, desc, location, wage, duration, skills, count, dateInput;
     Button post;
     ImageButton btnBack;
-    DBHelper dbHelper;
-    int employerId;
+    ProgressBar progressBar;
+    String employerId;
     final Calendar calendar = Calendar.getInstance();
 
     @Override
@@ -30,7 +31,11 @@ public class PostJobActivity extends AppCompatActivity {
         setContentView(R.layout.employer_activity_post_job);
 
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        employerId = sharedPreferences.getInt("userId", -1);
+        employerId = sharedPreferences.getString("userId", "");
+
+        if (employerId.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            employerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         btnBack = findViewById(R.id.btnBack);
         title = findViewById(R.id.etTitle);
@@ -42,8 +47,7 @@ public class PostJobActivity extends AppCompatActivity {
         count = findViewById(R.id.etCount);
         dateInput = findViewById(R.id.etDate);
         post = findViewById(R.id.btnPost);
-
-        dbHelper = new DBHelper(this);
+        progressBar = findViewById(R.id.progressBar);
 
         btnBack.setOnClickListener(v -> finish());
 
@@ -71,27 +75,28 @@ public class PostJobActivity extends AppCompatActivity {
                 return;
             }
 
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
-            ContentValues values = new ContentValues();
-            values.put("employer_id", employerId);
-            values.put("title", titleStr);
-            values.put("description", desc.getText().toString());
-            values.put("location", location.getText().toString());
-            values.put("wage", Double.parseDouble(wageStr));
-            values.put("duration_days", Integer.parseInt(durationStr));
-            values.put("required_skills", skills.getText().toString());
-            values.put("workers_needed", Integer.parseInt(countStr));
-            values.put("job_date", dateStr);
-            values.put("status", "OPEN");
+            if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+            post.setEnabled(false);
 
-            long id = db.insert("jobs", null, values);
+            Job newJob = new Job(employerId, titleStr, desc.getText().toString(), 
+                                location.getText().toString(), Double.parseDouble(wageStr));
+            
+            newJob.setDurationDays(Integer.parseInt(durationStr));
+            newJob.setRequiredSkills(skills.getText().toString());
+            newJob.setWorkersNeeded(Integer.parseInt(countStr));
+            newJob.setJobDate(dateStr);
 
-            if (id != -1) {
-                Toast.makeText(this, "Job Posted Successfully", Toast.LENGTH_SHORT).show();
-                finish();
-            } else {
-                Toast.makeText(this, "Error posting job", Toast.LENGTH_SHORT).show();
-            }
+            FirestoreManager.getInstance().postJob(newJob)
+                .addOnSuccessListener(aVoid -> {
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
+                    Toast.makeText(this, "Job Posted Successfully in Realtime!", Toast.LENGTH_SHORT).show();
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
+                    post.setEnabled(true);
+                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
         });
     }
 

@@ -3,8 +3,6 @@ package com.example.worklink.employer;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -13,31 +11,42 @@ import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import java.util.ArrayList;
 
-import com.example.worklink.DBHelper;
+import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
+import com.example.worklink.models.Booking;
+import com.example.worklink.models.Job;
+import com.example.worklink.models.User;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import java.util.ArrayList;
 
 public class VerifyActivity extends AppCompatActivity {
 
     ListView listView;
-    DBHelper dbHelper;
     TextView tvTitle;
     ArrayList<VerifyItem> verifyItems;
     VerifyAdapter adapter;
     ImageButton btnBack;
-    int employerId;
+    String employerId;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_job_feed);
 
+        db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
-        employerId = sharedPreferences.getInt("userId", -1);
+        employerId = sharedPreferences.getString("userId", "");
+
+        if (employerId.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            employerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         listView = findViewById(R.id.jobListView);
-        dbHelper = new DBHelper(this);
         verifyItems = new ArrayList<>();
 
         tvTitle = findViewById(R.id.tvTitle);
@@ -50,47 +59,65 @@ public class VerifyActivity extends AppCompatActivity {
             btnBack.setOnClickListener(v -> finish());
         }
 
+        adapter = new VerifyAdapter(this, verifyItems);
+        listView.setAdapter(adapter);
+
         loadBookings();
     }
 
     private void loadBookings() {
-        verifyItems.clear();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        // Fetch jobs posted by this employer
+        db.collection("jobs")
+                .whereEqualTo("employerId", employerId)
+                .get()
+                .addOnSuccessListener(jobSnapshots -> {
+                    verifyItems.clear();
+                    for (QueryDocumentSnapshot jobDoc : jobSnapshots) {
+                        Job job = jobDoc.toObject(Job.class);
+                        fetchAcceptedBookingsForJob(job);
+                    }
+                });
+    }
 
-        Cursor cursor = db.rawQuery(
-                "SELECT b.booking_id, u.name, j.title, j.wage, b.worker_id, j.duration_days " +
-                        "FROM bookings b " +
-                        "JOIN jobs j ON b.job_id = j.job_id " +
-                        "JOIN users u ON b.worker_id = u.id " +
-                        "WHERE j.employer_id=? AND b.status='ACCEPTED'",
-                new String[]{String.valueOf(employerId)});
+    private void fetchAcceptedBookingsForJob(Job job) {
+        db.collection("bookings")
+                .whereEqualTo("jobId", job.getJobId())
+                .whereEqualTo("status", "ACCEPTED")
+                .get()
+                .addOnSuccessListener(bookingSnapshots -> {
+                    for (QueryDocumentSnapshot bookingDoc : bookingSnapshots) {
+                        Booking booking = bookingDoc.toObject(Booking.class);
+                        fetchWorkerDetailsAndAdd(job, booking);
+                    }
+                });
+    }
 
-        while (cursor.moveToNext()) {
-            verifyItems.add(new VerifyItem(
-                cursor.getInt(0),
-                cursor.getString(1),
-                cursor.getString(2),
-                cursor.getDouble(3),
-                cursor.getInt(4),
-                cursor.getInt(5)
-            ));
-        }
-        cursor.close();
-
-        adapter = new VerifyAdapter(this, verifyItems);
-        listView.setAdapter(adapter);
-        
-        if (verifyItems.isEmpty()) {
-            Toast.makeText(this, "No active bookings to verify.", Toast.LENGTH_SHORT).show();
-        }
+    private void fetchWorkerDetailsAndAdd(Job job, Booking booking) {
+        db.collection("users").document(booking.getWorkerId()).get().addOnSuccessListener(userDoc -> {
+            if (userDoc.exists()) {
+                User user = userDoc.toObject(User.class);
+                if (user != null) {
+                    verifyItems.add(new VerifyItem(
+                        booking.getBookingId(),
+                        user.getName(),
+                        job.getTitle(),
+                        job.getWage() != null ? job.getWage() : 0.0,
+                        user.getId(),
+                        job.getDurationDays() != null ? job.getDurationDays() : 1
+                    ));
+                    adapter.notifyDataSetChanged();
+                }
+            }
+        });
     }
 
     static class VerifyItem {
-        int bookingId, workerId, duration;
+        String bookingId, workerId;
+        int duration;
         String workerName, jobTitle;
         double dailyWage, total;
 
-        VerifyItem(int bId, String wName, String jTitle, double wage, int wId, int dur) {
+        VerifyItem(String bId, String wName, String jTitle, double wage, String wId, int dur) {
             this.bookingId = bId;
             this.workerName = wName;
             this.jobTitle = jTitle;
@@ -121,21 +148,19 @@ public class VerifyActivity extends AppCompatActivity {
                          "\nTotal: ₹" + item.total + " (" + item.duration + " days)");
 
             btnComplete.setOnClickListener(v -> {
-                SQLiteDatabase db = dbHelper.getWritableDatabase();
-                db.execSQL("UPDATE bookings SET status='COMPLETED', actual_days=? WHERE booking_id=?",
-                        new Object[]{item.duration, item.bookingId});
-
-                Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
-                intent.putExtra("bookingId", item.bookingId);
-                intent.putExtra("workerId", item.workerId);
-                intent.putExtra("amount", item.total);
-                startActivity(intent);
-                finish();
+                db.collection("bookings").document(item.bookingId)
+                        .update("status", "COMPLETED", "actualDays", item.duration)
+                        .addOnSuccessListener(aVoid -> {
+                            Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
+                            intent.putExtra("bookingId", item.bookingId);
+                            intent.putExtra("workerId", item.workerId);
+                            intent.putExtra("amount", item.total);
+                            startActivity(intent);
+                            finish();
+                        });
             });
 
-            btnTerminate.setOnClickListener(v -> {
-                showTerminateDialog(item);
-            });
+            btnTerminate.setOnClickListener(v -> showTerminateDialog(item));
 
             return convertView;
         }
@@ -153,10 +178,7 @@ public class VerifyActivity extends AppCompatActivity {
 
         builder.setPositiveButton("Proceed to Payment", (dialog, which) -> {
             String daysStr = input.getText().toString();
-            if (daysStr.isEmpty()) {
-                Toast.makeText(this, "Please enter days worked", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (daysStr.isEmpty()) return;
 
             int daysWorked = Integer.parseInt(daysStr);
             if (daysWorked > item.duration) {
@@ -166,16 +188,16 @@ public class VerifyActivity extends AppCompatActivity {
 
             double newTotal = daysWorked * item.dailyWage;
 
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
-            db.execSQL("UPDATE bookings SET status='TERMINATED', actual_days=? WHERE booking_id=?",
-                    new Object[]{daysWorked, item.bookingId});
-
-            Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
-            intent.putExtra("bookingId", item.bookingId);
-            intent.putExtra("workerId", item.workerId);
-            intent.putExtra("amount", newTotal);
-            startActivity(intent);
-            finish();
+            db.collection("bookings").document(item.bookingId)
+                    .update("status", "TERMINATED", "actualDays", daysWorked)
+                    .addOnSuccessListener(aVoid -> {
+                        Intent intent = new Intent(VerifyActivity.this, PaymentRatingActivity.class);
+                        intent.putExtra("bookingId", item.bookingId);
+                        intent.putExtra("workerId", item.workerId);
+                        intent.putExtra("amount", newTotal);
+                        startActivity(intent);
+                        finish();
+                    });
         });
 
         builder.setNegativeButton("Cancel", null);
