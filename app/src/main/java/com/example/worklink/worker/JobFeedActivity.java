@@ -23,6 +23,7 @@ import java.util.Set;
 
 public class JobFeedActivity extends AppCompatActivity {
 
+    private static final String TAG = "JobFeedActivity";
     ListView listView;
     ImageButton btnBack;
     ArrayList<String> jobsDisplayList;
@@ -47,6 +48,12 @@ public class JobFeedActivity extends AppCompatActivity {
             workerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         }
 
+        if (workerId.isEmpty()) {
+            Toast.makeText(this, "Error: User session not found. Please login again.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
         btnBack = findViewById(R.id.btnBack);
         listView = findViewById(R.id.jobListView);
         
@@ -58,6 +65,13 @@ public class JobFeedActivity extends AppCompatActivity {
 
         btnBack.setOnClickListener(v -> finish());
 
+        // Handle job clicks
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            if (position >= 0 && position < fullJobsList.size()) {
+                showApplyDialog(fullJobsList.get(position));
+            }
+        });
+
         // First listen to apps, then jobs
         startRealtimeAppListener();
     }
@@ -66,12 +80,19 @@ public class JobFeedActivity extends AppCompatActivity {
         appListener = db.collection("applications")
                 .whereEqualTo("workerId", workerId)
                 .addSnapshotListener((value, error) -> {
-                    if (error != null) return;
+                    if (error != null) {
+                        Log.e(TAG, "Error listening to applications", error);
+                        return;
+                    }
                     if (value != null) {
                         appliedJobIds.clear();
                         for (QueryDocumentSnapshot doc : value) {
+                            String status = doc.getString("status");
                             String jId = doc.getString("jobId");
-                            if (jId != null) appliedJobIds.add(jId);
+                            // Only count as "applied" if the application is not withdrawn
+                            if (jId != null && !"withdrawn".equals(status)) {
+                                appliedJobIds.add(jId);
+                            }
                         }
                         if (jobListener == null) startRealtimeJobListener();
                         else filterAndRefreshUI();
@@ -85,7 +106,8 @@ public class JobFeedActivity extends AppCompatActivity {
         jobListener = FirestoreManager.getInstance().getAvailableJobsQuery()
                 .addSnapshotListener((value, error) -> {
                     if (error != null) {
-                        Toast.makeText(this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Error listening to jobs", error);
+                        Toast.makeText(this, "Error loading jobs: " + error.getMessage(), Toast.LENGTH_SHORT).show();
                         return;
                     }
                     if (value != null) {
@@ -101,12 +123,21 @@ public class JobFeedActivity extends AppCompatActivity {
         fullJobsList.clear();
         for (QueryDocumentSnapshot doc : lastJobSnapshot) {
             Job job = doc.toObject(Job.class);
+            // Ensure jobId is set from document ID if missing
+            if (job.getJobId() == null) {
+                job.setJobId(doc.getId());
+            }
+            
             if (!appliedJobIds.contains(job.getJobId())) {
                 fullJobsList.add(job);
                 jobsDisplayList.add(job.getTitle() + " - ₹" + job.getWage() + "\n" + job.getLocation());
             }
         }
         adapter.notifyDataSetChanged();
+        
+        if (fullJobsList.isEmpty()) {
+            Toast.makeText(this, "No new jobs available at the moment.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showApplyDialog(Job job) {
@@ -119,6 +150,10 @@ public class JobFeedActivity extends AppCompatActivity {
     }
 
     private void applyForJob(Job job) {
+        if (job.getJobId() == null) {
+            Toast.makeText(this, "Error: Invalid Job ID", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Application newApp = new Application(job.getJobId(), workerId);
         FirestoreManager.getInstance().applyForJob(newApp)
                 .addOnSuccessListener(aVoid -> Toast.makeText(this, "Applied Successfully!", Toast.LENGTH_SHORT).show())

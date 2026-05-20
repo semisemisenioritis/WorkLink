@@ -4,33 +4,41 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.util.Pair;
-import com.google.android.material.datepicker.MaterialDatePicker;
-
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Locale;
-
 import com.example.worklink.FirestoreManager;
 import com.example.worklink.R;
 import com.example.worklink.models.Payment;
 import com.example.worklink.models.Rating;
 import com.example.worklink.models.User;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
+
 public class EarningsActivity extends AppCompatActivity {
 
+    private static final String TAG = "EarningsActivity";
     TextView earningsText, ratingText, tvSelectedRange;
     Button btnDateRange, btnClear;
     ImageButton btnBack;
-    ListView reviewsList;
+    ListView historyList;
     String workerId;
     private FirebaseFirestore db;
 
@@ -44,15 +52,22 @@ public class EarningsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.worker_activity_earnings);
 
+        // Date formatting consistent with DatePicker's UTC selection
+        displaySdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
         db = FirebaseFirestore.getInstance();
         SharedPreferences sharedPreferences = getSharedPreferences("UserSession", Context.MODE_PRIVATE);
         workerId = sharedPreferences.getString("userId", "");
+
+        if (TextUtils.isEmpty(workerId) && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            workerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         btnBack = findViewById(R.id.btnBack);
         earningsText = findViewById(R.id.tvEarnings);
         ratingText = findViewById(R.id.tvOverallRating);
         tvSelectedRange = findViewById(R.id.tvSelectedRange);
-        reviewsList = findViewById(R.id.lvReviews);
+        historyList = findViewById(R.id.lvReviews); 
         btnDateRange = findViewById(R.id.btnDateRange);
         btnClear = findViewById(R.id.btnClearFilter);
         
@@ -67,7 +82,12 @@ public class EarningsActivity extends AppCompatActivity {
             loadData();
         });
 
-        loadData();
+        if (!TextUtils.isEmpty(workerId)) {
+            loadData();
+        } else {
+            Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     private void showDateRangePicker() {
@@ -81,9 +101,16 @@ public class EarningsActivity extends AppCompatActivity {
         dateRangePicker.addOnPositiveButtonClickListener(selection -> {
             if (selection.first != null && selection.second != null) {
                 startDateFilter = new Date(selection.first);
-                endDateFilter = new Date(selection.second);
                 
-                String displayRange = displaySdf.format(startDateFilter) + " - " + displaySdf.format(endDateFilter);
+                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                calendar.setTimeInMillis(selection.second);
+                calendar.set(Calendar.HOUR_OF_DAY, 23);
+                calendar.set(Calendar.MINUTE, 59);
+                calendar.set(Calendar.SECOND, 59);
+                calendar.set(Calendar.MILLISECOND, 999);
+                endDateFilter = calendar.getTime();
+                
+                String displayRange = displaySdf.format(startDateFilter) + " - " + displaySdf.format(new Date(selection.second));
                 tvSelectedRange.setText(displayRange);
                 btnClear.setVisibility(View.VISIBLE);
                 loadData();
@@ -92,8 +119,9 @@ public class EarningsActivity extends AppCompatActivity {
     }
 
     private void loadData() {
-        // 1. Load Overall Rating from User profile
+        // 1. Load Overall Rating from User document
         FirestoreManager.getInstance().getUser(workerId).addOnSuccessListener(doc -> {
+            if (isFinishing() || isDestroyed()) return;
             if (doc.exists()) {
                 User user = doc.toObject(User.class);
                 if (user != null && user.getWorkerRating() != null) {
@@ -102,7 +130,7 @@ public class EarningsActivity extends AppCompatActivity {
             }
         });
 
-        // 2. Load Payments and calculate total
+        // 2. Load Job History
         Query paymentQuery = db.collection("payments")
                 .whereEqualTo("workerId", workerId)
                 .whereEqualTo("paymentStatus", "PAID");
@@ -112,35 +140,98 @@ public class EarningsActivity extends AppCompatActivity {
                                      .whereLessThanOrEqualTo("paymentDate", new Timestamp(endDateFilter));
         }
 
-        paymentQuery.get().addOnSuccessListener(queryDocumentSnapshots -> {
-            double total = 0;
-            for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                Payment payment = doc.toObject(Payment.class);
-                if (payment.getAmount() != null) {
-                    total += payment.getAmount();
+        // Add ordering - THIS REQUIRES A COMPOSITE INDEX
+        paymentQuery = paymentQuery.orderBy("paymentDate", Query.Direction.DESCENDING);
+
+        paymentQuery.get().addOnSuccessListener(paymentDocs -> {
+            if (isFinishing() || isDestroyed()) return;
+            
+            double totalEarnings = 0;
+            if (paymentDocs.isEmpty()) {
+                earningsText.setText("Total: ₹0.00");
+                ArrayList<String> emptyList = new ArrayList<>();
+                emptyList.add("No job history found.");
+                historyList.setAdapter(new ArrayAdapter<>(this, R.layout.list_item_white_text, emptyList));
+                return;
+            }
+
+            List<Task<?>> detailTasks = new ArrayList<>();
+            List<Payment> paymentsList = new ArrayList<>();
+
+            for (QueryDocumentSnapshot doc : paymentDocs) {
+                Payment p = doc.toObject(Payment.class);
+                if (p == null || TextUtils.isEmpty(p.getBookingId())) continue;
+
+                paymentsList.add(p);
+                totalEarnings += (p.getAmount() != null ? p.getAmount() : 0.0);
+                
+                // Fetch Job Title via Booking
+                detailTasks.add(db.collection("bookings").document(p.getBookingId()).get().continueWithTask(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                        String jId = task.getResult().getString("jobId");
+                        if (!TextUtils.isEmpty(jId)) {
+                            return db.collection("jobs").document(jId).get();
+                        }
+                    }
+                    return Tasks.forResult(null);
+                }));
+                
+                // Fetch Rating for this specific booking
+                detailTasks.add(db.collection("ratings").whereEqualTo("bookingId", p.getBookingId()).limit(1).get());
+            }
+
+            final double finalTotal = totalEarnings;
+            Tasks.whenAllComplete(detailTasks).addOnSuccessListener(results -> {
+                if (isFinishing() || isDestroyed()) return;
+                
+                ArrayList<String> historyStrings = new ArrayList<>();
+                earningsText.setText(String.format(Locale.getDefault(), "Total: ₹%.2f", finalTotal));
+
+                for (int i = 0; i < paymentsList.size(); i++) {
+                    Payment p = paymentsList.get(i);
+                    Task<?> jobTask = detailTasks.get(i * 2);
+                    Task<?> ratingTask = detailTasks.get(i * 2 + 1);
+
+                    DocumentSnapshot jobDoc = null;
+                    if (jobTask.isSuccessful() && jobTask.getResult() instanceof DocumentSnapshot) {
+                        jobDoc = (DocumentSnapshot) jobTask.getResult();
+                    }
+
+                    com.google.firebase.firestore.QuerySnapshot ratingSnap = null;
+                    if (ratingTask.isSuccessful() && ratingTask.getResult() instanceof com.google.firebase.firestore.QuerySnapshot) {
+                        ratingSnap = (com.google.firebase.firestore.QuerySnapshot) ratingTask.getResult();
+                    }
+
+                    String title = (jobDoc != null && jobDoc.exists()) ? jobDoc.getString("title") : "Completed Job";
+                    String ratingStr = "N/A";
+                    String reviewStr = "No review";
+
+                    if (ratingSnap != null && !ratingSnap.isEmpty()) {
+                        Rating r = ratingSnap.getDocuments().get(0).toObject(Rating.class);
+                        if (r != null) {
+                            ratingStr = r.getRating() + "⭐";
+                            reviewStr = TextUtils.isEmpty(r.getReview()) ? "No comment" : r.getReview();
+                        }
+                    }
+
+                    String dateStr = (p.getPaymentDate() != null) ? displaySdf.format(p.getPaymentDate().toDate()) : "N/A";
+
+                    String entry = "Job: " + title + " (" + dateStr + ")\n" +
+                                   "Earned: ₹" + (p.getAmount() != null ? p.getAmount() : 0.0) + " | Rating: " + ratingStr + "\n" +
+                                   "Review: \"" + reviewStr + "\"";
+                    historyStrings.add(entry);
+                }
+                historyList.setAdapter(new ArrayAdapter<>(this, R.layout.list_item_white_text, historyStrings));
+            });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Error loading history", e);
+            if (!isFinishing() && !isDestroyed()) {
+                if (e.getMessage() != null && e.getMessage().contains("requires an index")) {
+                    Toast.makeText(this, "Index missing! Check Logcat for the link to fix.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "Failed to load history: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             }
-            earningsText.setText(String.format(Locale.getDefault(), "Total: ₹%.2f", total));
-        });
-
-        // 3. Load Reviews (Ratings)
-        Query ratingQuery = db.collection("ratings")
-                .whereEqualTo("givenTo", workerId)
-                .orderBy("createdAt", Query.Direction.DESCENDING);
-
-        ratingQuery.get().addOnSuccessListener(queryDocumentSnapshots -> {
-            ArrayList<String> reviews = new ArrayList<>();
-            if (queryDocumentSnapshots.isEmpty()) {
-                reviews.add("No reviews found.");
-            } else {
-                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                    Rating r = doc.toObject(Rating.class);
-                    String display = "Rating: " + r.getRating() + "⭐\n" +
-                                     "\"" + (TextUtils.isEmpty(r.getReview()) ? "No comment" : r.getReview()) + "\"";
-                    reviews.add(display);
-                }
-            }
-            reviewsList.setAdapter(new ArrayAdapter<>(this, R.layout.list_item_white_text, reviews));
         });
     }
 }
